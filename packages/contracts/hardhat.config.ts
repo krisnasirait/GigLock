@@ -31,11 +31,8 @@ export default defineConfig({
       accounts: [DEPLOYER_PRIVATE_KEY],
     },
   },
-  blockExplorers: {
-    giwaSepolia: {
-      name: "GIWA Sepolia Explorer",
-      url: "https://sepolia-explorer.giwa.io",
-      apiUrl: "https://sepolia-explorer.giwa.io/api",
-    },
-  },
+  // Block explorer verification (Blockscout-compatible) is wired in a
+  // follow-up plan via @nomicfoundation/hardhat-verify. The default HH3
+  // config shape does not expose a top-level blockExplorers field, so
+  // we defer the explorer wiring until verification is actually used.
 });
