@@ -1,0 +1,44 @@
+{
+  "name": "giglock",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Instant pay and portable reputation for gig workers, built on GIWA Chain",
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "scripts": {
+    "install:all": "pnpm install",
+    "build": "pnpm -r --filter=./packages/* run build",
+    "build:contracts": "pnpm --filter @giglock/contracts run build",
+    "build:shared": "pnpm --filter @giglock/shared run build",
+    "build:frontend": "pnpm --filter @giglock/frontend run build",
+    "build:relayer": "pnpm --filter @giglock/relayer run build",
+    "test": "pnpm -r run test",
+    "test:contracts": "pnpm --filter @giglock/contracts run test",
+    "test:relayer": "pnpm --filter @giglock/relayer run test",
+    "lint": "pnpm -r run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,sol,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,sol,json,md}\"",
+    "typecheck": "pnpm -r run typecheck",
+    "dev": "pnpm -r --parallel --filter=./packages/{shared,frontend,relayer} run dev",
+    "dev:frontend": "pnpm --filter @giglock/frontend run dev",
+    "dev:relayer": "pnpm --filter @giglock/relayer run dev",
+    "deploy:local": "pnpm --filter @giglock/contracts run deploy:local",
+    "deploy:testnet": "pnpm --filter @giglock/contracts run deploy:giwa-testnet",
+    "verify": "pnpm --filter @giglock/contracts run verify",
+    "clean": "pnpm -r exec rm -rf dist node_modules .turbo coverage typechain-types",
+    "clean:install": "pnpm clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.16.0",
+    "@types/node": "^22.10.0",
+    "eslint": "^9.16.0",
+    "globals": "^15.13.0",
+    "prettier": "^3.4.2",
+    "prettier-plugin-solidity": "^2.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.18.0"
+  }
+}
