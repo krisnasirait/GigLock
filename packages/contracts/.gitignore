@@ -1,0 +1,3 @@
+# Intentionally empty — the root .gitignore already covers all generated
+# directories (artifacts/, cache/, typechain-types/, node_modules/, etc.).
+# This file exists so the package directory has its own gitignore anchor.

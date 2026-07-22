@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "./dist",
+    "rootDir": ".",
+    "types": ["node", "hardhat"]
+  },
+  "include": ["./hardhat.config.ts", "./ignition.config.ts", "./ignition", "./tasks", "./scripts", "./test"],
+  "exclude": ["node_modules", "artifacts", "cache", "typechain-types"]
+}
