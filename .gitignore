@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+artifacts/
+cache/
+typechain-types/
+coverage/
+coverage.json
+
+# Env files (NEVER commit real secrets)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# IDE / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Hardhat / Solidity
+openzeppelin/
+.openzeppelin/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Vite
+.vite/
