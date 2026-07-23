@@ -1,0 +1,39 @@
+{
+  "name": "@giglock/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./chains": {
+      "types": "./dist/chains.d.ts",
+      "default": "./dist/chains.js"
+    },
+    "./eip712": {
+      "types": "./dist/eip712.d.ts",
+      "default": "./dist/eip712.js"
+    }
+  },
+  "files": ["dist", "src/abis"],
+  "scripts": {
+    "build": "tsx src/scripts/generate-abis.ts && tsc -p tsconfig.json",
+    "generate-abis": "tsx src/scripts/generate-abis.ts",
+    "dev": "tsx watch src/index.ts",
+    "lint": "echo 'lint shared (no-op for now)'",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist src/abis/*.ts.bak"
+  },
+  "dependencies": {
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@giglock/contracts": "workspace:*",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}
