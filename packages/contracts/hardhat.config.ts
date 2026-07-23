@@ -1,5 +1,6 @@
 import { defineConfig } from "hardhat/config";
 import hardhatToolboxViem from "@nomicfoundation/hardhat-toolbox-viem";
+import giglockTestShim from "./plugins/test-shim.js";
 import * as dotenv from "dotenv";
 
 dotenv.config();
@@ -10,7 +11,7 @@ const GIWA_SEPOLIA_RPC_URL =
   process.env.GIWA_SEPOLIA_RPC_URL ?? "https://sepolia-rpc.giwa.io";
 
 export default defineConfig({
-  plugins: [hardhatToolboxViem],
+  plugins: [hardhatToolboxViem, giglockTestShim],
   solidity: {
     version: "0.8.24",
     settings: {

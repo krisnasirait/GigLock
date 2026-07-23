@@ -15,11 +15,13 @@
     "clean": "rm -rf artifacts cache typechain-types ignition/deployments"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox-viem": "^5.0.0",
     "@nomicfoundation/hardhat-ignition": "^3.0.0",
     "@nomicfoundation/hardhat-ignition-viem": "^3.0.0",
+    "@nomicfoundation/hardhat-toolbox-viem": "^5.0.0",
     "@nomicfoundation/hardhat-viem": "^3.0.0",
+    "@types/chai": "^5.0.0",
     "@types/node": "^22.10.0",
+    "chai": "^6.2.2",
     "dotenv": "^16.4.7",
     "hardhat": "^3.8.0",
     "solhint": "^5.0.4",
