@@ -41,6 +41,12 @@ export const JobFactoryAbi = [
         "internalType": "uint256",
         "name": "totalAmount",
         "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "metadataCid",
+        "type": "string"
       }
     ],
     "name": "JobCreated",
@@ -84,6 +90,11 @@ export const JobFactoryAbi = [
         "internalType": "uint256[]",
         "name": "milestoneAmounts",
         "type": "uint256[]"
+      },
+      {
+        "internalType": "string",
+        "name": "metadataCid",
+        "type": "string"
       }
     ],
     "name": "createJob",
