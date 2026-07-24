@@ -6,6 +6,11 @@ import { HomePage } from './pages/HomePage';
 import { AppDashboardPage } from './pages/AppDashboardPage';
 import { NewJobPage } from './pages/NewJobPage';
 import { JobDetailPage } from './pages/JobDetailPage';
+import { ProtocolPage } from './pages/ProtocolPage';
+import { EcosystemPage } from './pages/EcosystemPage';
+import { DevelopersPage } from './pages/DevelopersPage';
+import { GiwaIdPage } from './pages/GiwaIdPage';
+import { DocsPage } from './pages/DocsPage';
 import { PlaceholderPage } from './components/PlaceholderPage';
 
 export function App() {
@@ -17,61 +22,11 @@ export function App() {
         <main className="flex-1">
           <Routes>
             <Route path="/" element={<HomePage />} />
-            <Route
-              path="/protocol"
-              element={
-                <PlaceholderPage
-                  title="Protocol"
-                  description="Deep dive into the GigLock protocol — smart contracts, escrow mechanics, and on-chain trust primitives."
-                  icon="⚙️"
-                  color="#3b82f6"
-                />
-              }
-            />
-            <Route
-              path="/ecosystem"
-              element={
-                <PlaceholderPage
-                  title="Ecosystem"
-                  description="Explore the growing network of platforms and applications building on top of GigLock infrastructure."
-                  icon="🌐"
-                  color="#10b981"
-                />
-              }
-            />
-            <Route
-              path="/developers"
-              element={
-                <PlaceholderPage
-                  title="Developers"
-                  description="Integrate GigLock into your platform. SDKs, APIs, and smart contract ABIs for every stack."
-                  icon="🛠️"
-                  color="#f59e0b"
-                />
-              }
-            />
-            <Route
-              path="/giwa-id"
-              element={
-                <PlaceholderPage
-                  title="GIWA ID"
-                  description="Your on-chain identity. Soulbound, portable, and verifiable across every platform in the ecosystem."
-                  icon="🪪"
-                  color="#8b5cf6"
-                />
-              }
-            />
-            <Route
-              path="/docs"
-              element={
-                <PlaceholderPage
-                  title="Documentation"
-                  description="Everything you need to understand and build with GigLock — guides, references, and tutorials."
-                  icon="📚"
-                  color="#22d3ee"
-                />
-              }
-            />
+            <Route path="/protocol" element={<ProtocolPage />} />
+            <Route path="/ecosystem" element={<EcosystemPage />} />
+            <Route path="/developers" element={<DevelopersPage />} />
+            <Route path="/giwa-id" element={<GiwaIdPage />} />
+            <Route path="/docs" element={<DocsPage />} />
             <Route
               path="/app"
               element={<AppDashboardPage />}
