@@ -17,13 +17,13 @@ import {
   assertMetricsAddresses,
   blockRanges,
   chunkItems,
+  GIWA_DEPLOYMENT_BLOCK,
+  GIWA_LOG_CHUNK_SIZE,
   type JobSnapshot,
   type ProtocolEvent,
   type ProtocolMetrics,
 } from "./model.js";
 
-const DEPLOYMENT_BLOCK = 31_535_952n;
-const LOG_CHUNK_SIZE = 20_000n;
 const ADDRESS_BATCH_SIZE = 100;
 const METRICS_STALE_TIME = 30_000;
 const METRICS_REFRESH_INTERVAL = 60_000;
@@ -50,7 +50,7 @@ async function loadJobCreatedLogs(
   latestBlock: bigint,
 ) {
   const pages = await Promise.all(
-    blockRanges(DEPLOYMENT_BLOCK, latestBlock, LOG_CHUNK_SIZE).map(
+    blockRanges(GIWA_DEPLOYMENT_BLOCK, latestBlock, GIWA_LOG_CHUNK_SIZE).map(
       ([fromBlock, toBlock]) =>
         publicClient.getContractEvents({
           address: jobFactory,
@@ -70,7 +70,7 @@ async function loadEscrowLogs(addresses: Address[], latestBlock: bigint) {
 
   const pages = await Promise.all(
     addressBatches(addresses).flatMap((addressBatch) =>
-      blockRanges(DEPLOYMENT_BLOCK, latestBlock, LOG_CHUNK_SIZE).map(
+      blockRanges(GIWA_DEPLOYMENT_BLOCK, latestBlock, GIWA_LOG_CHUNK_SIZE).map(
         ([fromBlock, toBlock]) =>
           publicClient.getLogs({
             address: addressBatch,

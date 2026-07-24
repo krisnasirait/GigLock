@@ -12,6 +12,7 @@ import { EscrowJobAbi, JobFactoryAbi } from "@giglock/shared";
 vi.mock("../../lib/wagmi.js", () => ({
   ACTIVE_CHAIN_ID: 91342,
   publicClient: {
+    getBlockNumber: vi.fn(),
     getContractEvents: vi.fn(),
     multicall: vi.fn(),
     readContract: vi.fn(),
@@ -37,6 +38,7 @@ function testReceipt(value: object): TestReceipt {
   return value as TestReceipt;
 }
 const chain = publicClient as unknown as {
+  getBlockNumber: ReturnType<typeof vi.fn>;
   getContractEvents: ReturnType<typeof vi.fn>;
   multicall: ReturnType<typeof vi.fn>;
   readContract: ReturnType<typeof vi.fn>;
@@ -205,6 +207,7 @@ describe("job transaction workflows", () => {
 
   it("hydrates only factory-authorized worker events", async () => {
     chain.readContract.mockResolvedValue(1n);
+    chain.getBlockNumber.mockResolvedValue(31_555_952n);
     chain.multicall
       .mockResolvedValueOnce([job])
       .mockResolvedValueOnce([2, factory, account, 5n, "not-a-valid-cid", 0n]);
@@ -213,12 +216,24 @@ describe("job transaction workflows", () => {
     await expect(loadWorkerJobs(account)).resolves.toMatchObject([
       { address: job, worker: account },
     ]);
-    expect(chain.getContractEvents).toHaveBeenCalledWith({
+    expect(chain.getContractEvents).toHaveBeenCalledTimes(2);
+    expect(chain.getContractEvents).toHaveBeenNthCalledWith(1, {
       address: [job],
       abi: EscrowJobAbi,
       eventName: "JobAccepted",
       args: { worker: account },
       strict: true,
+      fromBlock: 31_535_952n,
+      toBlock: 31_555_951n,
+    });
+    expect(chain.getContractEvents).toHaveBeenNthCalledWith(2, {
+      address: [job],
+      abi: EscrowJobAbi,
+      eventName: "JobAccepted",
+      args: { worker: account },
+      strict: true,
+      fromBlock: 31_555_952n,
+      toBlock: 31_555_952n,
     });
     expect(chain.multicall).toHaveBeenLastCalledWith({
       contracts: [

@@ -1,6 +1,11 @@
 import { EscrowJobAbi, JobFactoryAbi, addressesByChain } from "@giglock/shared";
 import { type Address } from "viem";
 import { ACTIVE_CHAIN_ID, publicClient } from "../../lib/wagmi.js";
+import {
+  blockRanges,
+  GIWA_DEPLOYMENT_BLOCK,
+  GIWA_LOG_CHUNK_SIZE,
+} from "../protocolMetrics/model.js";
 import { fetchJobMetadata } from "./ipfs.js";
 import type { JobMetadataV1, MilestoneTuple } from "./model.js";
 
@@ -146,16 +151,23 @@ export async function loadWorkerJobs(account: Address): Promise<JobChainSnapshot
   const factoryJobs = await loadFactoryJobAddresses();
   if (factoryJobs.length === 0) return [];
 
+  const latestBlock = await publicClient.getBlockNumber();
+
   const acceptedJobs = (
     await Promise.all(
-      addressBatches(factoryJobs).map((address) =>
-        publicClient.getContractEvents({
-          address,
-          abi: EscrowJobAbi,
-          eventName: "JobAccepted",
-          args: { worker: account },
-          strict: true,
-        }),
+      addressBatches(factoryJobs).flatMap((address) =>
+        blockRanges(GIWA_DEPLOYMENT_BLOCK, latestBlock, GIWA_LOG_CHUNK_SIZE).map(
+          ([fromBlock, toBlock]) =>
+            publicClient.getContractEvents({
+              address,
+              abi: EscrowJobAbi,
+              eventName: "JobAccepted",
+              args: { worker: account },
+              fromBlock,
+              toBlock,
+              strict: true,
+            }),
+        ),
       ),
     )
   ).flat();

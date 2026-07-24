@@ -4,6 +4,9 @@ import { formatUnits, isAddressEqual, zeroAddress } from "viem";
 const DAY_SECONDS = 86_400;
 const CURRENT_PERIOD_DAYS = 7;
 
+export const GIWA_DEPLOYMENT_BLOCK = 31_535_952n;
+export const GIWA_LOG_CHUNK_SIZE = 20_000n;
+
 export type JobSnapshot = {
   address: Address;
   status: number;
