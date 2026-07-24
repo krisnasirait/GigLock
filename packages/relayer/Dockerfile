@@ -37,7 +37,7 @@ RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 WORKDIR /repo
 
 # Copy the small subset needed at runtime.
-COPY --from=builder /repo/package.json /repo/pnpm-workspace.yaml /repo/tsconfig.base.json ./
+COPY --from=builder /repo/package.json /repo/pnpm-workspace.yaml /repo/pnpm-lock.yaml /repo/tsconfig.base.json ./
 COPY --from=builder /repo/packages/shared/package.json /repo/packages/shared/
 COPY --from=builder /repo/packages/shared/dist /repo/packages/shared/dist
 COPY --from=builder /repo/packages/relayer/package.json /repo/packages/relayer/
