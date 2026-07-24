@@ -1,34 +1,102 @@
-import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Navbar } from './components/Navbar';
+import { Footer } from './components/Footer';
+import { BlockchainFooter } from './components/BlockchainFooter';
+import { HomePage } from './pages/HomePage';
+import { PlaceholderPage } from './components/PlaceholderPage';
 
 export function App() {
   return (
-    <div className="min-h-screen bg-ink-900 bg-grid-glow">
-      <header className="flex items-center justify-between px-8 py-6 border-b border-white/5">
-        <div className="flex items-center gap-3">
-          <div className="size-9 rounded-lg bg-gradient-to-br from-neon-blue to-neon-violet" />
-          <span className="text-xl font-semibold">GigLock</span>
-        </div>
-        <ConnectButton showBalance={false} chainStatus="icon" accountStatus="address" />
-      </header>
+    <BrowserRouter>
+      <div className="min-h-screen bg-[#030712] text-white flex flex-col">
+        <Navbar />
 
-      <main className="max-w-5xl mx-auto px-8 py-16">
-        <h1 className="text-5xl font-bold tracking-tight">
-          The Trust Layer for the{" "}
-          <span className="bg-gradient-to-r from-neon-blue to-neon-violet bg-clip-text text-transparent">
-            Gig Economy
-          </span>
-        </h1>
-        <p className="mt-4 text-lg text-white/70 max-w-2xl">
-          Instant escrow payments. Portable reputation. Built on GIWA Chain.
-        </p>
+        <main className="flex-1">
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route
+              path="/protocol"
+              element={
+                <PlaceholderPage
+                  title="Protocol"
+                  description="Deep dive into the GigLock protocol — smart contracts, escrow mechanics, and on-chain trust primitives."
+                  icon="⚙️"
+                  color="#3b82f6"
+                />
+              }
+            />
+            <Route
+              path="/ecosystem"
+              element={
+                <PlaceholderPage
+                  title="Ecosystem"
+                  description="Explore the growing network of platforms and applications building on top of GigLock infrastructure."
+                  icon="🌐"
+                  color="#10b981"
+                />
+              }
+            />
+            <Route
+              path="/developers"
+              element={
+                <PlaceholderPage
+                  title="Developers"
+                  description="Integrate GigLock into your platform. SDKs, APIs, and smart contract ABIs for every stack."
+                  icon="🛠️"
+                  color="#f59e0b"
+                />
+              }
+            />
+            <Route
+              path="/giwa-id"
+              element={
+                <PlaceholderPage
+                  title="GIWA ID"
+                  description="Your on-chain identity. Soulbound, portable, and verifiable across every platform in the ecosystem."
+                  icon="🪪"
+                  color="#8b5cf6"
+                />
+              }
+            />
+            <Route
+              path="/docs"
+              element={
+                <PlaceholderPage
+                  title="Documentation"
+                  description="Everything you need to understand and build with GigLock — guides, references, and tutorials."
+                  icon="📚"
+                  color="#22d3ee"
+                />
+              }
+            />
+            <Route
+              path="/app"
+              element={
+                <PlaceholderPage
+                  title="Launch Protocol"
+                  description="The full GigLock dApp — post jobs, lock escrow, build reputation, and get paid on-chain."
+                  icon="🚀"
+                  color="#3b82f6"
+                />
+              }
+            />
+            <Route
+              path="*"
+              element={
+                <PlaceholderPage
+                  title="404 — Not Found"
+                  description="This page doesn't exist on-chain or off. Head back home."
+                  icon="🔍"
+                  color="#ef4444"
+                />
+              }
+            />
+          </Routes>
+        </main>
 
-        <div className="mt-12 rounded-xl border border-white/10 bg-ink-800/50 p-6 text-sm text-white/60">
-          <p>
-            Scaffold base ready. Job board, post-job, and profile screens will be added in the next
-            plan.
-          </p>
-        </div>
-      </main>
-    </div>
+        <Footer />
+        <BlockchainFooter />
+      </div>
+    </BrowserRouter>
   );
 }
