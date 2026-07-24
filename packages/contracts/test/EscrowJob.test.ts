@@ -37,7 +37,7 @@ describe("EscrowJob", () => {
       address: factory.address,
       abi: factory.abi,
       functionName: "createJob",
-      args: [[parseUnits("100", 6), parseUnits("50", 6)]],
+      args: [[parseUnits("100", 6), parseUnits("50", 6)], "bafy-job-metadata"],
       account: clientWallet.account,
     } as any);
     await publicClient.waitForTransactionReceipt({ hash: createHash });
@@ -61,6 +61,13 @@ describe("EscrowJob", () => {
     const { jobAddr } = await setup();
     const job = await hre.viem.getContractAt("EscrowJob", jobAddr);
     expect((await job.read.status()) as number).to.equal(0); // Created
+  });
+
+  it("stores metadata CID on the created escrow", async () => {
+    const { jobAddr } = await setup();
+    const job = await hre.viem.getContractAt("EscrowJob", jobAddr);
+
+    expect(await job.read.metadataCid()).to.equal("bafy-job-metadata");
   });
 
   it("client funds job → status Funded", async () => {
@@ -150,10 +157,14 @@ describe("EscrowJob", () => {
     h = await worker.writeContract({
       address: job.address, abi: job.abi,
       functionName: "submitMilestone",
-      args: [0n, ("0x" + "11".repeat(32)) as `0x${string}`],
+      args: [0n, ("0x" + "11".repeat(32)) as `0x${string}`, "bafy-proof"],
       account: worker.account,
     } as any);
     await publicClient.waitForTransactionReceipt({ hash: h });
+
+    const milestone = await job.read.milestones([0n]);
+    expect(milestone[2]).to.equal(("0x" + "11".repeat(32)));
+    expect(milestone[3]).to.equal("bafy-proof");
 
     // Confirm milestone 0
     h = await client.writeContract({
@@ -192,7 +203,7 @@ describe("EscrowJob", () => {
     h = await worker.writeContract({
       address: job.address, abi: job.abi,
       functionName: "submitMilestone",
-      args: [0n, ("0x" + "22".repeat(32)) as `0x${string}`],
+      args: [0n, ("0x" + "22".repeat(32)) as `0x${string}`, "bafy-proof"],
       account: worker.account,
     } as any);
     await publicClient.waitForTransactionReceipt({ hash: h });
@@ -204,7 +215,7 @@ describe("EscrowJob", () => {
     await publicClient.waitForTransactionReceipt({ hash: h });
 
     // milestone status should be Disputed (3)
-    const m0 = (await job.read.milestones([0n])) as readonly [bigint, number, `0x${string}`, bigint, bigint];
+    const m0 = (await job.read.milestones([0n])) as readonly [bigint, number, `0x${string}`, string, bigint, bigint];
     expect(m0[1]).to.equal(3);
   });
 
@@ -216,9 +227,52 @@ describe("EscrowJob", () => {
       worker.writeContract({
         address: job.address, abi: job.abi,
         functionName: "submitMilestone",
-        args: [0n, ("0x" + "33".repeat(32)) as `0x${string}`],
+        args: [0n, ("0x" + "33".repeat(32)) as `0x${string}`, "bafy-proof"],
         account: worker.account,
       } as any).then((h: any) => publicClient.waitForTransactionReceipt({ hash: h })),
     );
+  });
+
+  it("rejects zero proof hashes and empty or overlong proof CIDs", async () => {
+    const { jobAddr, mockUsdc, client, worker, publicClient } = await setup();
+    const job = await hre.viem.getContractAt("EscrowJob", jobAddr);
+    const total = parseUnits("150", 6);
+    const validHash = ("0x" + "44".repeat(32)) as `0x${string}`;
+    const zeroHash = ("0x" + "00".repeat(32)) as `0x${string}`;
+
+    let h = await client.writeContract({
+      address: mockUsdc.address, abi: mockUsdc.abi,
+      functionName: "approve", args: [jobAddr, total],
+      account: client.account,
+    } as any);
+    await publicClient.waitForTransactionReceipt({ hash: h });
+    h = await client.writeContract({
+      address: job.address, abi: job.abi,
+      functionName: "fundJob", args: [],
+      account: client.account,
+    } as any);
+    await publicClient.waitForTransactionReceipt({ hash: h });
+    h = await worker.writeContract({
+      address: job.address, abi: job.abi,
+      functionName: "acceptJob", args: [],
+      account: worker.account,
+    } as any);
+    await publicClient.waitForTransactionReceipt({ hash: h });
+
+    for (const [proofHash, proofCid] of [
+      [zeroHash, "bafy-proof"],
+      [validHash, ""],
+      [validHash, "x".repeat(129)],
+    ] as const) {
+      await expectRevert(
+        worker.writeContract({
+          address: job.address,
+          abi: job.abi,
+          functionName: "submitMilestone",
+          args: [0n, proofHash, proofCid],
+          account: worker.account,
+        } as any).then((hash: any) => publicClient.waitForTransactionReceipt({ hash })),
+      );
+    }
   });
 });

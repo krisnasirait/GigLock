@@ -12,7 +12,7 @@ contract JobFactory {
     address[] public allJobs;
     mapping(address => address[]) public jobsByClient;
 
-    event JobCreated(address indexed jobContract, address indexed client, uint256 totalAmount);
+    event JobCreated(address indexed jobContract, address indexed client, uint256 totalAmount, string metadataCid);
 
     constructor(address _token, address _registry, address _arbiter) {
         token = _token;
@@ -20,13 +20,14 @@ contract JobFactory {
         arbiter = _arbiter;
     }
 
-    function createJob(uint256[] calldata milestoneAmounts) external returns (address) {
+    function createJob(uint256[] calldata milestoneAmounts, string calldata metadataCid) external returns (address) {
         EscrowJob job = new EscrowJob(
             msg.sender,
             token,
             reputationRegistry,
             arbiter,
-            milestoneAmounts
+            milestoneAmounts,
+            metadataCid
         );
         ReputationRegistry(reputationRegistry).authorizeCaller(address(job));
 
@@ -35,7 +36,7 @@ contract JobFactory {
 
         uint256 total;
         for (uint256 i = 0; i < milestoneAmounts.length; i++) total += milestoneAmounts[i];
-        emit JobCreated(address(job), msg.sender, total);
+        emit JobCreated(address(job), msg.sender, total, metadataCid);
         return address(job);
     }
 

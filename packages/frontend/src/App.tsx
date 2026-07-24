@@ -3,6 +3,9 @@ import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { BlockchainFooter } from './components/BlockchainFooter';
 import { HomePage } from './pages/HomePage';
+import { AppDashboardPage } from './pages/AppDashboardPage';
+import { NewJobPage } from './pages/NewJobPage';
+import { JobDetailPage } from './pages/JobDetailPage';
 import { PlaceholderPage } from './components/PlaceholderPage';
 
 export function App() {
@@ -71,15 +74,10 @@ export function App() {
             />
             <Route
               path="/app"
-              element={
-                <PlaceholderPage
-                  title="Launch Protocol"
-                  description="The full GigLock dApp — post jobs, lock escrow, build reputation, and get paid on-chain."
-                  icon="🚀"
-                  color="#3b82f6"
-                />
-              }
+              element={<AppDashboardPage />}
             />
+            <Route path="/app/jobs/new" element={<NewJobPage />} />
+            <Route path="/app/jobs/:address" element={<JobDetailPage />} />
             <Route
               path="*"
               element={

@@ -12,6 +12,8 @@ import { keccak256 } from "viem";
 
 const relayerUrl = (import.meta.env.VITE_RELAYER_URL ?? "").replace(/\/+$/, "");
 
+export const MAX_IPFS_UPLOAD_BYTES = 10 * 1024 * 1024;
+
 export type PinResult = {
   cid: string;
   url: string;
@@ -29,12 +31,13 @@ export type PinResult = {
  */
 export async function uploadProof(file: File): Promise<PinResult> {
   if (!relayerUrl) {
-    throw new Error(
-      "VITE_RELAYER_URL is not set. Configure it in packages/frontend/.env.local.",
-    );
+    throw new Error("VITE_RELAYER_URL is not set. Configure it in packages/frontend/.env.local.");
   }
   if (file.size === 0) {
     throw new Error("File is empty.");
+  }
+  if (file.size > MAX_IPFS_UPLOAD_BYTES) {
+    throw new Error("File exceeds the 10 MiB IPFS upload limit.");
   }
 
   const fd = new FormData();

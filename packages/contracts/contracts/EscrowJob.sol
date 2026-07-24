@@ -23,6 +23,7 @@ contract EscrowJob is ReentrancyGuard {
         uint256 amount;
         MilestoneStatus status;
         bytes32 proofHash;
+        string proofCid;
         uint256 submittedAt;
         uint256 confirmDeadline;
     }
@@ -34,14 +35,16 @@ contract EscrowJob is ReentrancyGuard {
     address public immutable arbiter;
 
     uint256 public constant CONFIRM_WINDOW = 48 hours;
+    uint256 private constant MAX_CID_LENGTH = 128;
 
     Milestone[] public milestones;
     JobStatus public status;
     bool public workerAccepted;
+    string public metadataCid;
 
     event JobFunded(uint256 totalAmount);
     event JobAccepted(address indexed worker);
-    event MilestoneSubmitted(uint256 indexed milestoneId, bytes32 proofHash, uint256 deadline);
+    event MilestoneSubmitted(uint256 indexed milestoneId, bytes32 proofHash, string proofCid, uint256 deadline);
     event MilestoneConfirmed(uint256 indexed milestoneId, address by);
     event MilestoneReleased(uint256 indexed milestoneId, uint256 amount, string releaseType);
     event DisputeRaised(uint256 indexed milestoneId);
@@ -58,18 +61,23 @@ contract EscrowJob is ReentrancyGuard {
         address _token,
         address _reputationRegistry,
         address _arbiter,
-        uint256[] memory milestoneAmounts
+        uint256[] memory milestoneAmounts,
+        string memory _metadataCid
     ) {
         require(milestoneAmounts.length > 0, "no milestones");
+        require(bytes(_metadataCid).length > 0, "empty metadata CID");
+        require(bytes(_metadataCid).length <= MAX_CID_LENGTH, "metadata CID too long");
         client = _client;
         token = IERC20(_token);
         reputationRegistry = IReputationRegistryEscrow(_reputationRegistry);
         arbiter = _arbiter;
+        metadataCid = _metadataCid;
         for (uint256 i = 0; i < milestoneAmounts.length; i++) {
             milestones.push(Milestone({
                 amount: milestoneAmounts[i],
                 status: MilestoneStatus.Pending,
                 proofHash: bytes32(0),
+                proofCid: "",
                 submittedAt: 0,
                 confirmDeadline: 0
             }));
@@ -94,14 +102,18 @@ contract EscrowJob is ReentrancyGuard {
         emit JobAccepted(msg.sender);
     }
 
-    function submitMilestone(uint256 milestoneId, bytes32 proofHash) external onlyWorker {
+    function submitMilestone(uint256 milestoneId, bytes32 proofHash, string calldata proofCid) external onlyWorker {
         Milestone storage m = milestones[milestoneId];
         require(m.status == MilestoneStatus.Pending, "invalid state");
+        require(proofHash != bytes32(0), "empty proof hash");
+        require(bytes(proofCid).length > 0, "empty proof CID");
+        require(bytes(proofCid).length <= MAX_CID_LENGTH, "proof CID too long");
         m.status = MilestoneStatus.Submitted;
         m.proofHash = proofHash;
+        m.proofCid = proofCid;
         m.submittedAt = block.timestamp;
         m.confirmDeadline = block.timestamp + CONFIRM_WINDOW;
-        emit MilestoneSubmitted(milestoneId, proofHash, m.confirmDeadline);
+        emit MilestoneSubmitted(milestoneId, proofHash, proofCid, m.confirmDeadline);
     }
 
     function confirmMilestone(uint256 milestoneId) external onlyClient nonReentrant {

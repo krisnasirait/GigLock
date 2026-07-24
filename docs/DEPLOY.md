@@ -204,27 +204,27 @@ Deployment artifacts are written to `packages/contracts/ignition/deployments/`. 
 
 ### 5.3 Record addresses in the shared package
 
-The GIWA Sepolia deployment completed on 2026-07-24. JobFactory was deployed at
-block `31535952`.
+The CID-aware GIWA Sepolia deployment completed on 2026-07-24. JobFactory was
+deployed at block `31554719`.
 
 | Contract | Address | Explorer |
 |---|---|---|
-| JobFactory | `0x34Cb4E2D1791fC1eD51F4DEf4171129903976113` | [View](https://sepolia-explorer.giwa.io/address/0x34Cb4E2D1791fC1eD51F4DEf4171129903976113) |
-| MockUSDC | `0xE85931C270e358b182e64eE83d00524658a375Cf` | [View](https://sepolia-explorer.giwa.io/address/0xE85931C270e358b182e64eE83d00524658a375Cf) |
-| MockUSDCFaucet | `0x10CfE424F4c7079aD5346F55c96723aBC4aeC50f` | [View](https://sepolia-explorer.giwa.io/address/0x10CfE424F4c7079aD5346F55c96723aBC4aeC50f) |
-| ReputationRegistry | `0xfA172Bd33BdDD43CDe5436184b65A5586C7387dF` | [View](https://sepolia-explorer.giwa.io/address/0xfA172Bd33BdDD43CDe5436184b65A5586C7387dF) |
-| Arbiter | `0xF9404775587261aD5eA698bc9A1496C39E2Df3c5` | [View](https://sepolia-explorer.giwa.io/address/0xF9404775587261aD5eA698bc9A1496C39E2Df3c5) |
+| JobFactory | `0xb01fDC7B8df1A5E4f7F843046f734C6fD622DDFF` | [View](https://sepolia-explorer.giwa.io/address/0xb01fDC7B8df1A5E4f7F843046f734C6fD622DDFF) |
+| MockUSDC | `0xf5d40D37cA17eC7e5a2e4Ae170e4deF0e57B99eb` | [View](https://sepolia-explorer.giwa.io/address/0xf5d40D37cA17eC7e5a2e4Ae170e4deF0e57B99eb) |
+| MockUSDCFaucet | `0xc04f1831C8821a5eff267c6cB4D7e6ba847b5A9b` | [View](https://sepolia-explorer.giwa.io/address/0xc04f1831C8821a5eff267c6cB4D7e6ba847b5A9b) |
+| ReputationRegistry | `0xE8BCF79C93d40565DdCFaAE4bA3d9a24C7dC8B6E` | [View](https://sepolia-explorer.giwa.io/address/0xE8BCF79C93d40565DdCFaAE4bA3d9a24C7dC8B6E) |
+| Arbiter | `0xEC61bf4e000B72B8a4f94556B608e03673Df629E` | [View](https://sepolia-explorer.giwa.io/address/0xEC61bf4e000B72B8a4f94556B608e03673Df629E) |
 
 `packages/shared/src/addresses.ts` records these values:
 
 ```ts
 export const GIWA_SEPOLIA_ADDRESSES: ChainAddresses = {
-  jobFactory: "0x34Cb4E2D1791fC1eD51F4DEf4171129903976113",
-  reputationRegistry: "0xfA172Bd33BdDD43CDe5436184b65A5586C7387dF",
-  arbiter: "0xF9404775587261aD5eA698bc9A1496C39E2Df3c5",
+  jobFactory: "0xb01fDC7B8df1A5E4f7F843046f734C6fD622DDFF",
+  reputationRegistry: "0xE8BCF79C93d40565DdCFaAE4bA3d9a24C7dC8B6E",
+  arbiter: "0xEC61bf4e000B72B8a4f94556B608e03673Df629E",
   minimalForwarder: "0x0000000000000000000000000000000000000000",
-  mockUsdc: "0xE85931C270e358b182e64eE83d00524658a375Cf",
-  mockUsdcFaucet: "0x10CfE424F4c7079aD5346F55c96723aBC4aeC50f",
+  mockUsdc: "0xf5d40D37cA17eC7e5a2e4Ae170e4deF0e57B99eb",
+  mockUsdcFaucet: "0xc04f1831C8821a5eff267c6cB4D7e6ba847b5A9b",
   dojangScroll:     SEPOLIA_DOJANG_CONTRACTS.dojangScroll,
 };
 ```
@@ -300,7 +300,7 @@ Once you've connected the GitHub repo, every push to `main` automatically redepl
 ### 6.5 Live homepage metric definitions
 
 The homepage reads GigLock events and contract state directly from GIWA
-Sepolia. It starts scanning at JobFactory deployment block `31535952`.
+Sepolia. It starts scanning at JobFactory deployment block `31554719`.
 
 | Card | Live definition |
 |---|---|

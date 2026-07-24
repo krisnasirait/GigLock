@@ -36,6 +36,11 @@ describe("JobFactory", () => {
     return { mockUsdc, registry, arbiter, factory, client, anyone, publicClient, deployer };
   }
 
+  async function expectRevert(promise: Promise<unknown>): Promise<void> {
+    try { await promise; } catch (_) { return; }
+    throw new Error("expected revert, got success");
+  }
+
   it("createJob deploys an EscrowJob and authorizes it on the registry", async () => {
     const { factory, registry, client, publicClient } = await deployAll();
     const amount = 1_000_000n; // 1 USDC (6 decimals)
@@ -44,7 +49,7 @@ describe("JobFactory", () => {
       address: factory.address,
       abi: factory.abi,
       functionName: "createJob",
-      args: [[amount]],
+      args: [[amount], "bafy-job-metadata"],
       account: client.account,
     } as any);
     await publicClient.waitForTransactionReceipt({ hash });
@@ -69,7 +74,7 @@ describe("JobFactory", () => {
         address: factory.address,
         abi: factory.abi,
         functionName: "createJob",
-        args: [[]],
+        args: [[], "bafy-job-metadata"],
         account: client.account,
       } as any);
       await publicClient.waitForTransactionReceipt({ hash });
@@ -77,5 +82,21 @@ describe("JobFactory", () => {
       reverted = true;
     }
     expect(reverted).to.equal(true);
+  });
+
+  it("rejects empty and overlong metadata CIDs", async () => {
+    const { factory, client, publicClient } = await deployAll();
+
+    for (const cid of ["", "x".repeat(129)]) {
+      await expectRevert(
+        client.writeContract({
+          address: factory.address,
+          abi: factory.abi,
+          functionName: "createJob",
+          args: [[1_000_000n], cid],
+          account: client.account,
+        } as any).then((hash: any) => publicClient.waitForTransactionReceipt({ hash })),
+      );
+    }
   });
 });

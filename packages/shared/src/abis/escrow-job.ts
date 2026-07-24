@@ -26,6 +26,11 @@ export const EscrowJobAbi = [
         "internalType": "uint256[]",
         "name": "milestoneAmounts",
         "type": "uint256[]"
+      },
+      {
+        "internalType": "string",
+        "name": "_metadataCid",
+        "type": "string"
       }
     ],
     "stateMutability": "nonpayable",
@@ -161,6 +166,12 @@ export const EscrowJobAbi = [
       },
       {
         "indexed": false,
+        "internalType": "string",
+        "name": "proofCid",
+        "type": "string"
+      },
+      {
+        "indexed": false,
         "internalType": "uint256",
         "name": "deadline",
         "type": "uint256"
@@ -275,6 +286,19 @@ export const EscrowJobAbi = [
   },
   {
     "inputs": [],
+    "name": "metadataCid",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "milestoneCount",
     "outputs": [
       {
@@ -310,6 +334,11 @@ export const EscrowJobAbi = [
         "internalType": "bytes32",
         "name": "proofHash",
         "type": "bytes32"
+      },
+      {
+        "internalType": "string",
+        "name": "proofCid",
+        "type": "string"
       },
       {
         "internalType": "uint256",
@@ -411,6 +440,11 @@ export const EscrowJobAbi = [
         "internalType": "bytes32",
         "name": "proofHash",
         "type": "bytes32"
+      },
+      {
+        "internalType": "string",
+        "name": "proofCid",
+        "type": "string"
       }
     ],
     "name": "submitMilestone",
