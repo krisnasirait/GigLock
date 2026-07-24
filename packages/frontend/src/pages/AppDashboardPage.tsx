@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { MockUSDCAbi, MockUSDCFaucetAbi, addressesByChain } from "@giglock/shared";
 import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
@@ -205,7 +206,19 @@ export function AppDashboardPage() {
           <h1>Jobs in motion</h1>
           <p>Track funded work, wallet balances, and the on-chain escrow path from one place.</p>
         </div>
-        <p className="dashboard-network"><span aria-hidden="true" /> GIWA Sepolia · Chain 91342</p>
+        <div className="flex items-center gap-3 flex-wrap">
+          <p className="dashboard-network"><span aria-hidden="true" /> GIWA Sepolia · Chain 91342</p>
+          {canWrite && (
+            <Link to="/app/jobs/new">
+              <button className="btn-primary text-sm flex items-center gap-2" id="post-job-btn">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                Post a Job
+              </button>
+            </Link>
+          )}
+        </div>
       </header>
 
       <WalletGate />
@@ -250,7 +263,8 @@ export function AppDashboardPage() {
             <h2 id="job-list-heading">Job board</h2>
             <p>Listings read directly from GIWA Sepolia, even before a wallet is connected.</p>
           </div>
-          <div className="dashboard-tabs" role="tablist" aria-label="Job lists">
+          <div className="flex items-center gap-3">
+            <div className="dashboard-tabs" role="tablist" aria-label="Job lists">
             {dashboardTabs.map(({ value, label }, index) => (
               <button
                 aria-controls={`${value}-panel`}
@@ -268,6 +282,17 @@ export function AppDashboardPage() {
                 {label}
               </button>
             ))}
+            </div>
+            {canWrite && (
+              <Link to="/app/jobs/new">
+                <button className="btn-primary text-xs flex items-center gap-1.5 px-3 py-1.5" id="post-job-board-btn">
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  Post a Job
+                </button>
+              </Link>
+            )}
           </div>
         </div>
         {dashboardTabs.map(({ value }) => {
