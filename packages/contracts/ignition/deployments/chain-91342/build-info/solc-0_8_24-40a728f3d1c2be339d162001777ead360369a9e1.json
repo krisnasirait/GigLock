@@ -1,0 +1,49 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_24-40a728f3d1c2be339d162001777ead360369a9e1",
+  "solcVersion": "0.8.24",
+  "solcLongVersion": "0.8.24+commit.e11b9ed9",
+  "compilerType": "solc",
+  "toolVersions": {
+    "hardhat": "3.11.0"
+  },
+  "userSourceNameMap": {
+    "contracts/Arbiter.sol": "project/contracts/Arbiter.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "shanghai",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode.linkReferences",
+            "evm.bytecode.object",
+            "evm.bytecode.opcodes",
+            "evm.bytecode.sourceMap",
+            "evm.deployedBytecode.immutableReferences",
+            "evm.deployedBytecode.linkReferences",
+            "evm.deployedBytecode.object",
+            "evm.deployedBytecode.opcodes",
+            "evm.deployedBytecode.sourceMap",
+            "evm.methodIdentifiers"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/Arbiter.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.24;\n\ninterface IEscrowJobForArbiter {\n    function resolveDispute(uint256 milestoneId, bool releaseToWorker) external;\n}\n\ncontract Arbiter {\n    address public admin;\n\n    struct DisputeCase {\n        address jobContract;\n        uint256 milestoneId;\n        bool resolved;\n        bool releasedToWorker;\n    }\n\n    mapping(uint256 => DisputeCase) public cases;\n    uint256 public caseCount;\n\n    event DisputeFiled(uint256 indexed caseId, address indexed jobContract, uint256 milestoneId);\n    event DisputeDecided(uint256 indexed caseId, bool releasedToWorker);\n\n    error NotAdmin();\n\n    modifier onlyAdmin() {\n        if (msg.sender != admin) revert NotAdmin();\n        _;\n    }\n\n    constructor(address _admin) {\n        admin = _admin;\n    }\n\n    function fileDispute(uint256 milestoneId) external {\n        cases[caseCount] = DisputeCase({\n            jobContract: msg.sender,\n            milestoneId: milestoneId,\n            resolved: false,\n            releasedToWorker: false\n        });\n        emit DisputeFiled(caseCount, msg.sender, milestoneId);\n        caseCount++;\n    }\n\n    function decide(uint256 caseId, bool releaseToWorker) external onlyAdmin {\n        DisputeCase storage c = cases[caseId];\n        require(!c.resolved, \"already resolved\");\n        c.resolved = true;\n        c.releasedToWorker = releaseToWorker;\n        IEscrowJobForArbiter(c.jobContract).resolveDispute(c.milestoneId, releaseToWorker);\n        emit DisputeDecided(caseId, releaseToWorker);\n    }\n}\n"
+      }
+    }
+  }
+}

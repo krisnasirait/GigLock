@@ -1,0 +1,49 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_24-c1c7d67f9ac315912a237f3d18a451495758afc3",
+  "solcVersion": "0.8.24",
+  "solcLongVersion": "0.8.24+commit.e11b9ed9",
+  "compilerType": "solc",
+  "toolVersions": {
+    "hardhat": "3.11.0"
+  },
+  "userSourceNameMap": {
+    "contracts/ReputationRegistry.sol": "project/contracts/ReputationRegistry.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "shanghai",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode.linkReferences",
+            "evm.bytecode.object",
+            "evm.bytecode.opcodes",
+            "evm.bytecode.sourceMap",
+            "evm.deployedBytecode.immutableReferences",
+            "evm.deployedBytecode.linkReferences",
+            "evm.deployedBytecode.object",
+            "evm.deployedBytecode.opcodes",
+            "evm.deployedBytecode.sourceMap",
+            "evm.methodIdentifiers"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/ReputationRegistry.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.24;\n\n/// @title IDojang\n/// @notice Minimal Dojang interface for the GIWA-verified check.\ninterface IDojang {\n    function isVerified(address user, bytes32 attesterId) external view returns (bool);\n}\n\n/// @title ReputationRegistry\n/// @notice Portable, per-wallet reputation. Only authorized callers\n///         (EscrowJob instances + Arbiter) may write. Every write\n///         enforces the GIWA Dojang identity gate — a wallet without\n///         a Verified Address cannot accrue reputation, defeating\n///         Sybil / reputation-laundering attacks via fresh wallets.\ncontract ReputationRegistry {\n    struct Reputation {\n        uint32 completedJobs;\n        uint32 onTimeCount;\n        uint32 ratingSum;\n        uint32 ratingCount;\n        uint32 disputesReceived;\n        uint32 disputesRaised;\n        uint32 disputesLost;\n    }\n\n    mapping(address => Reputation) public records;\n    mapping(address => bool) public authorizedCallers;\n\n    address public immutable dojangScroll;\n    bytes32 public immutable upbitAttesterId;\n    address public factory;\n    address public arbiter;\n\n    event CallerAuthorized(address indexed caller);\n    event ReputationUpdated(address indexed user);\n\n    error NotAuthorized();\n    error NotDojangVerified(address user);\n\n    modifier onlyAuthorized() {\n        if (!(authorizedCallers[msg.sender] || msg.sender == arbiter)) revert NotAuthorized();\n        _;\n    }\n\n    modifier onlyFactoryOrArbiter() {\n        require(msg.sender == factory || msg.sender == arbiter, \"only factory or arbiter\");\n        _;\n    }\n\n    modifier dojangVerified(address user) {\n        if (!IDojang(dojangScroll).isVerified(user, upbitAttesterId)) {\n            revert NotDojangVerified(user);\n        }\n        _;\n    }\n\n    constructor(address _dojangScroll, address _factory, bytes32 _upbitAttesterId) {\n        dojangScroll = _dojangScroll;\n        factory = _factory;\n        upbitAttesterId = _upbitAttesterId;\n    }\n\n    /// @notice Two-phase init: factory may not exist when this is constructed.\n    function setFactory(address _factory) external {\n        require(msg.sender == factory || msg.sender == tx.origin, \"init once\");\n        factory = _factory;\n    }\n\n    function authorizeCaller(address jobContract) external onlyFactoryOrArbiter {\n        authorizedCallers[jobContract] = true;\n        emit CallerAuthorized(jobContract);\n    }\n\n    function recordCompletion(address user, bool onTime)\n        external\n        onlyAuthorized\n        dojangVerified(user)\n    {\n        Reputation storage r = records[user];\n        unchecked {\n            r.completedJobs += 1;\n            if (onTime) r.onTimeCount += 1;\n        }\n        emit ReputationUpdated(user);\n    }\n\n    function recordRating(address user, uint8 score)\n        external\n        onlyAuthorized\n        dojangVerified(user)\n    {\n        require(score >= 1 && score <= 5, \"score 1-5\");\n        Reputation storage r = records[user];\n        unchecked {\n            r.ratingSum += score;\n            r.ratingCount += 1;\n        }\n        emit ReputationUpdated(user);\n    }\n\n    function recordDisputeRaised(address raiser)\n        external\n        onlyAuthorized\n        dojangVerified(raiser)\n    {\n        unchecked { records[raiser].disputesRaised += 1; }\n        emit ReputationUpdated(raiser);\n    }\n\n    function recordDisputeOutcome(address loser, address winner)\n        external\n        onlyAuthorized\n        dojangVerified(loser)\n    {\n        unchecked {\n            records[loser].disputesLost += 1;\n            records[loser].disputesReceived += 1;\n        }\n        emit ReputationUpdated(loser);\n        emit ReputationUpdated(winner);\n    }\n\n    /// @notice Reliability score 0-100, computed on read.\n    function reliabilityScore(address user) external view returns (uint256) {\n        Reputation memory r = records[user];\n        if (r.completedJobs == 0) return 0;\n\n        uint256 onTimeScore = (uint256(r.onTimeCount) * 40) / r.completedJobs;\n        uint256 ratingScore = r.ratingCount == 0\n            ? 0\n            : (uint256(r.ratingSum) * 40) / (r.ratingCount * 5);\n        uint256 disputePenalty = uint256(r.disputesReceived) * 5;\n        uint256 disputeScore = disputePenalty >= 20 ? 0 : 20 - disputePenalty;\n\n        return onTimeScore + ratingScore + disputeScore;\n    }\n}\n"
+      }
+    }
+  }
+}

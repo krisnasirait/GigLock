@@ -59,17 +59,20 @@ That's it. The rest of this document is the long version of those three steps.
                                                         │  │ ReputationRegistry   │  │
                                                         │  │   └─ DojangScroll    │  │
                                                         │  │ Arbiter               │  │
-                                                        │  │ MinimalForwarder      │  │
+                                                        │  │ MinimalForwarder*     │  │
                                                         │  │ MockUSDC              │  │
                                                         │  └──────────────────────┘  │
                                                         └────────────────────────────┘
 ```
 
-Data flow:
+Planned sponsored-transaction data flow:
 - Worker signs an EIP-712 typed-data payload in the browser (gas-free).
 - Frontend POSTs the signed payload to the relayer.
 - Relayer verifies the signature, calls `MinimalForwarder.execute(req, sig)` which lands the call at the target `EscrowJob` with `msg.sender == worker`.
 - Relayer pays the gas in GIWA ETH on behalf of the worker.
+
+`*` `MinimalForwarder` and the relayer `/meta-tx` route are not deployed yet. The
+current testnet deployment supports direct wallet transactions only.
 
 ---
 
@@ -164,8 +167,13 @@ Edit `.env`:
 ```dotenv
 GIWA_SEPOLIA_RPC_URL=https://sepolia-rpc.giwa.io
 DEPLOYER_PRIVATE_KEY=0x<64 hex chars — your deployer wallet>
-ARBITER_ADMIN_ADDRESS=0x<address that will be granted Arbiter.admin — usually your deployer or a multisig>
 ```
+
+The current Ignition module assigns account zero (the deployer) as
+`Arbiter.admin`. `ARBITER_ADMIN_ADDRESS` is present in the legacy environment
+template but is not read by the module and does not change the deployed admin.
+Use a dedicated testnet deployer. Before mainnet, change the module to accept an
+explicit multisig admin.
 
 > 🔐 The deployer wallet needs:
 > - Some GIWA Sepolia ETH (≥ 0.02 for the full Ignition module + verification gas)
@@ -196,29 +204,44 @@ Deployment artifacts are written to `packages/contracts/ignition/deployments/`. 
 
 ### 5.3 Record addresses in the shared package
 
-Update `packages/shared/src/addresses.ts` with the deployed addresses:
+The GIWA Sepolia deployment completed on 2026-07-24. JobFactory was deployed at
+block `31535952`.
+
+| Contract | Address | Explorer |
+|---|---|---|
+| JobFactory | `0x34Cb4E2D1791fC1eD51F4DEf4171129903976113` | [View](https://sepolia-explorer.giwa.io/address/0x34Cb4E2D1791fC1eD51F4DEf4171129903976113) |
+| MockUSDC | `0xE85931C270e358b182e64eE83d00524658a375Cf` | [View](https://sepolia-explorer.giwa.io/address/0xE85931C270e358b182e64eE83d00524658a375Cf) |
+| MockUSDCFaucet | `0x10CfE424F4c7079aD5346F55c96723aBC4aeC50f` | [View](https://sepolia-explorer.giwa.io/address/0x10CfE424F4c7079aD5346F55c96723aBC4aeC50f) |
+| ReputationRegistry | `0xfA172Bd33BdDD43CDe5436184b65A5586C7387dF` | [View](https://sepolia-explorer.giwa.io/address/0xfA172Bd33BdDD43CDe5436184b65A5586C7387dF) |
+| Arbiter | `0xF9404775587261aD5eA698bc9A1496C39E2Df3c5` | [View](https://sepolia-explorer.giwa.io/address/0xF9404775587261aD5eA698bc9A1496C39E2Df3c5) |
+
+`packages/shared/src/addresses.ts` records these values:
 
 ```ts
-export const SEPOLIA_ADDRESSES: ChainAddresses = {
-  jobFactory:       "0x<from step 5.2>",
-  reputationRegistry: "0x<from step 5.2>",
-  arbiter:          "0x<from step 5.2>",
-  minimalForwarder: "0x<to be deployed — see §10.5 below>",
-  mockUsdc:         "0x<from step 5.2>",
-  mockUsdcFaucet:   "0x<from step 5.2>",
+export const GIWA_SEPOLIA_ADDRESSES: ChainAddresses = {
+  jobFactory: "0x34Cb4E2D1791fC1eD51F4DEf4171129903976113",
+  reputationRegistry: "0xfA172Bd33BdDD43CDe5436184b65A5586C7387dF",
+  arbiter: "0xF9404775587261aD5eA698bc9A1496C39E2Df3c5",
+  minimalForwarder: "0x0000000000000000000000000000000000000000",
+  mockUsdc: "0xE85931C270e358b182e64eE83d00524658a375Cf",
+  mockUsdcFaucet: "0x10CfE424F4c7079aD5346F55c96723aBC4aeC50f",
   dojangScroll:     SEPOLIA_DOJANG_CONTRACTS.dojangScroll,
 };
 ```
 
-Then `pnpm --filter @giglock/shared build` to update `dist/`, and commit.
+The zero `minimalForwarder` value is intentional: that contract has not been
+implemented or deployed.
 
 ### 5.4 Verify on Blockscout
 
-```bash
-pnpm exec hardhat verify --network giwaSepolia <CONTRACT_ADDRESS> <constructor args...>
-```
+All five addresses above have runtime bytecode on GIWA Sepolia. Source-code
+verification is still manual because this repository does not currently install
+or configure the Hardhat verify plugin. Do not run the previously documented
+`hardhat verify` command until that plugin and Blockscout endpoint are added.
 
-(Blockscout's verification API is open — no API key needed. If Hardhat's `--verify` flag has trouble with the custom Blockscout endpoint, use the Remix IDE flow: open the contract page on <https://sepolia-explorer.giwa.io>, click "Verify & Publish", paste the flattened source. The Hardhat 3 plan to wire Blockscout verification is documented in `docs/superpowers/plans/`.)
+For manual verification, open a contract in the GIWA explorer, select
+**Verify & Publish**, and submit compiler `0.8.24` output with optimizer enabled
+for 200 runs and `viaIR: true`.
 
 ---
 
@@ -248,6 +271,12 @@ In **Project Settings → Environment Variables**, add for **all environments** 
 | `VITE_WALLETCONNECT_PROJECT_ID` | `<your WalletConnect project ID from §3>` | <https://cloud.walletconnect.com> |
 | `VITE_RELAYER_URL` | `https://<your-relayer>.onrender.com` (filled in §7) | Render deployment |
 
+(All `VITE_` values are embedded in the public browser bundle. Never put a
+private key or server secret in a `VITE_` variable.)
+
+After adding or changing an environment variable, use **Deployments → Redeploy**
+in Vercel. Variables do not alter a bundle that has already been built.
+
 (For mainnet, see §10; the `VITE_GIWA_RPC_URL` switches to mainnet and `VITE_CHAIN_ID` to the mainnet chain id.)
 
 ### 6.3 Deploy
@@ -267,6 +296,24 @@ Your production URL will look like `giglock-frontend-username.vercel.app`. To at
 ### 6.4 Continuous deployment
 
 Once you've connected the GitHub repo, every push to `main` automatically redeploys Production. Every push to a branch creates a unique Preview URL with its own env-var overrides. Vercel handles all of this.
+
+### 6.5 Live homepage metric definitions
+
+The homepage reads GigLock events and contract state directly from GIWA
+Sepolia. It starts scanning at JobFactory deployment block `31535952`.
+
+| Card | Live definition |
+|---|---|
+| **Total value locked** | Sum of current MockUSDC balances held by JobFactory-created escrow contracts. “Locked across N jobs” counts positive-balance escrows. |
+| **Total transactions** | Unique transaction hashes that emitted `JobCreated` or an EscrowJob protocol event. It is not the GIWA Chain-wide transaction count. |
+| **Active escrow jobs** | Jobs whose current status is `Funded` or `InProgress`. The donut is active jobs divided by all created jobs. |
+| **Average payment time** | Average block-timestamp difference from `MilestoneSubmitted` to the matching `MilestoneReleased`. |
+
+A new empty deployment displays `$0.00`, `0`, `0`, and `—`; the em dash means no
+completed payment pair exists yet. RPC or configuration failures display
+**Unavailable** with a retry action. The frontend never falls back to demo
+fixtures. Seven-day transaction trends appear only when a prior comparison
+period exists; historical TVL and active-job trends require a future indexer.
 
 ---
 
@@ -491,7 +538,8 @@ If you switch `JobFactory` and `ReputationRegistry` to OZ Transparent Proxy patt
 
 ### 10.5 Deploying the missing MinimalForwarder (for relayer)
 
-This is currently in scope to ship:
+This is not part of the current deployment and must be completed before
+sponsored transactions are enabled:
 1. Add `packages/contracts/contracts/MinimalForwarder.sol` (OZ preset, copy-paste from `node_modules/@openzeppelin/contracts/metatx/forwarders/`).
 2. Update Ignition module to deploy it as step 7.
 3. Set `MINIMAL_FORWARDER_ADDRESS` in Render env (the address the Ignition module prints).
