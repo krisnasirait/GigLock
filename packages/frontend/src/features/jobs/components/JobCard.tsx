@@ -1,4 +1,5 @@
 import { formatUnits } from "viem";
+import { MILESTONE_STATUS } from "../model.js";
 import type { JobChainSnapshot } from "../queries.js";
 import { JobStatusBadge } from "./JobStatusBadge.js";
 import { TransactionProgress } from "./TransactionProgress.js";
@@ -12,7 +13,10 @@ export function JobCard({ job }: { job: JobChainSnapshot }) {
   const amount = Number(formatUnits(job.totalAmount, 6)).toLocaleString(undefined, {
     maximumFractionDigits: 2,
   });
-  const completedMilestones = job.milestones.filter((milestone) => milestone[1] >= 2).length;
+  const completedMilestones = job.milestones.filter(
+    (milestone) =>
+      milestone[1] === MILESTONE_STATUS.Released || milestone[1] === MILESTONE_STATUS.Refunded,
+  ).length;
 
   return (
     <article className="job-card">

@@ -318,6 +318,7 @@
 .dashboard-feedback-error { color: #fca5a5; }
 .balance-card-action { margin-top: 1rem; }
 .claim-feedback { min-height: 1.5rem; margin: -2rem 0 1rem; color: #a5f3fc; font-size: 0.86rem; }
+.claim-feedback a { margin-left: 0.65rem; color: #a5f3fc; text-decoration: underline; text-underline-offset: 0.2rem; }
 
 .dashboard-jobs { padding-top: 0.5rem; }
 .dashboard-jobs-heading { margin-bottom: 1.25rem; }

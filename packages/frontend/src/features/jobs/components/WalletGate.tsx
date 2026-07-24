@@ -1,7 +1,8 @@
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useChainId, useSwitchChain } from "wagmi";
+import { GIWA_SEPOLIA_CHAIN_ID } from "../../../lib/chainConfig.js";
 
-export const GIWA_SEPOLIA_CHAIN_ID = 91342;
+export { GIWA_SEPOLIA_CHAIN_ID } from "../../../lib/chainConfig.js";
 
 export function useWalletWriteAccess() {
   const { address, isConnected } = useAccount();

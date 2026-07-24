@@ -1,7 +1,9 @@
+import type { ReactNode } from "react";
+
 type BalanceCardProps = {
   label: string;
   value: string;
-  detail: string;
+  detail: ReactNode;
   isLoading?: boolean;
   error?: string;
   action?: {

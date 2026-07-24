@@ -1,11 +1,12 @@
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
-import { pickChain } from "@giglock/shared/chains";
+import { giwaSepolia } from "@giglock/shared/chains";
 import { createPublicClient, http } from "viem";
+import { resolveDashboardChainId } from "./chainConfig.js";
 
-const chainId = Number(import.meta.env.VITE_CHAIN_ID ?? "31337");
+const chainId = resolveDashboardChainId(import.meta.env.VITE_CHAIN_ID);
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID ?? "DEMO_PROJECT_ID";
 
-export const activeChain = pickChain(chainId);
+export const activeChain = giwaSepolia;
 const rpcUrl =
   import.meta.env.VITE_GIWA_RPC_URL ?? activeChain.rpcUrls.default.http[0];
 
