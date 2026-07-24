@@ -1,13 +1,15 @@
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
-import { giwaSepolia } from "@giglock/shared/chains";
+import { pickChain } from "@giglock/shared/chains";
 
-const chainId = Number(import.meta.env.VITE_CHAIN_ID ?? "91342");
+const chainId = Number(import.meta.env.VITE_CHAIN_ID ?? "31337");
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID ?? "DEMO_PROJECT_ID";
+
+const chain = pickChain(chainId);
 
 export const wagmiConfig = getDefaultConfig({
   appName: "GigLock",
   projectId,
-  chains: [giwaSepolia],
+  chains: [chain],
   ssr: false,
 });
 
