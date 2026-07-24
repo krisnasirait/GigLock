@@ -227,23 +227,14 @@ describe("job transaction workflows", () => {
     await expect(loadWorkerJobs(account)).resolves.toMatchObject([
       { address: job, worker: account },
     ]);
-    expect(chain.getContractEvents).toHaveBeenCalledTimes(2);
-    expect(chain.getContractEvents).toHaveBeenNthCalledWith(1, {
+    expect(chain.getContractEvents).toHaveBeenCalledTimes(1);
+    expect(chain.getContractEvents).toHaveBeenCalledWith({
       address: [job],
       abi: EscrowJobAbi,
       eventName: "JobAccepted",
       args: { worker: account },
       strict: true,
-      fromBlock: 31_535_952n,
-      toBlock: 31_555_951n,
-    });
-    expect(chain.getContractEvents).toHaveBeenNthCalledWith(2, {
-      address: [job],
-      abi: EscrowJobAbi,
-      eventName: "JobAccepted",
-      args: { worker: account },
-      strict: true,
-      fromBlock: 31_555_952n,
+      fromBlock: 31_554_719n,
       toBlock: 31_555_952n,
     });
     expect(chain.multicall).toHaveBeenLastCalledWith({
