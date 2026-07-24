@@ -17,6 +17,7 @@ const testState = vi.hoisted(() => ({
   runFund: vi.fn(),
   fetchJobMetadata: vi.fn(),
   chainJobExists: false,
+  jobStatus: 0,
   publicClient: {
     readContract: vi.fn(),
     waitForTransactionReceipt: vi.fn(),
@@ -88,6 +89,7 @@ describe("NewJobPage", () => {
     testState.wallet.address = "0x1111111111111111111111111111111111111111" as Address;
     testState.wallet.canWrite = true;
     testState.chainJobExists = false;
+    testState.jobStatus = 0;
     testState.uploadJobMetadata.mockResolvedValue({ cid: metadataCid, url: "https://gateway.test/metadata" });
     testState.fetchJobMetadata.mockResolvedValue(metadata);
     testState.runCreate.mockImplementation(async () => {
@@ -101,7 +103,7 @@ describe("NewJobPage", () => {
       if (functionName === "client") return Promise.resolve(testState.wallet.address);
       if (functionName === "metadataCid") return Promise.resolve(metadataCid);
       if (functionName === "totalAmount") return Promise.resolve(25_250_000n);
-      if (functionName === "status") return Promise.resolve(0);
+      if (functionName === "status") return Promise.resolve(testState.jobStatus);
       if (functionName === "allowance") return Promise.resolve(0n);
       return Promise.resolve(0n);
     });
@@ -211,6 +213,51 @@ describe("NewJobPage", () => {
     await screen.findByText("Escrow funded on GIWA Sepolia.");
     expect(testState.runCreate).toHaveBeenCalledTimes(1);
     expect(testState.runFund).toHaveBeenCalledTimes(2);
+  });
+
+  it("treats a funding receipt interruption as terminal when the authoritative escrow status is Funded", async () => {
+    testState.writeContractAsync.mockResolvedValueOnce("0xfundpending");
+    testState.runFund.mockImplementationOnce(async ({ writeContract }) => {
+      await writeContract({});
+      testState.jobStatus = 1;
+      throw new Error("receipt RPC timed out");
+    });
+    const user = userEvent.setup();
+    renderPage();
+    await fillValidForm(user);
+
+    await user.click(screen.getByRole("button", { name: "Create and fund escrow" }));
+    await screen.findByText("Escrow funded on GIWA Sepolia.");
+
+    expect(testState.runFund).toHaveBeenCalledTimes(1);
+    const fundedButton = screen.getByRole("button", { name: "Escrow funded" }) as HTMLButtonElement;
+    expect(fundedButton).toHaveProperty("disabled", true);
+    fireEvent.submit(fundedButton.closest("form")!);
+    await waitFor(() => expect(testState.runFund).toHaveBeenCalledTimes(1));
+    expect(testState.runCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("recovers a reloaded fund transaction as terminal when the verified escrow is already Funded", async () => {
+    testState.chainJobExists = true;
+    testState.jobStatus = 1;
+    renderPage([`/app/jobs/new?job=${jobAddress}&cid=${metadataCid}&fundTx=0xfundpending`]);
+
+    await screen.findByText("Escrow funded on GIWA Sepolia.");
+    expect(screen.getByText(jobAddress)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Escrow funded" }) as HTMLButtonElement).toHaveProperty("disabled", true);
+    expect(testState.runCreate).not.toHaveBeenCalled();
+    expect(testState.runFund).not.toHaveBeenCalled();
+  });
+
+  it("releases a pending funding transaction only after an explicit reverted receipt", async () => {
+    testState.chainJobExists = true;
+    testState.publicClient.waitForTransactionReceipt.mockResolvedValueOnce({ status: "reverted" });
+    const user = userEvent.setup();
+    renderPage([`/app/jobs/new?job=${jobAddress}&cid=${metadataCid}&fundTx=0xfundpending`]);
+
+    await user.click(screen.getByRole("button", { name: "Check submitted funding" }));
+    expect(await screen.findByText("Funding transaction was reverted on GIWA Sepolia. You can try funding again.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Finish funding" })).toBeTruthy();
   });
 
   it("resumes a direct-navigation created escrow from verified chain data without validating an empty form", async () => {

@@ -1,4 +1,4 @@
-import { addressesByChain, EscrowJobAbi, JobFactoryAbi, MockUSDCAbi } from "@giglock/shared";
+import { addressesByChain, EscrowJobAbi, JOB_STATUS, JobFactoryAbi, MockUSDCAbi } from "@giglock/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { formatUnits, isAddress, isAddressEqual, type Address, type Hash } from "viem";
@@ -32,10 +32,17 @@ type ConfirmedJob = {
   client: Address;
   metadataCid: string;
   totalAmount: bigint;
+  status: number;
 };
 
 type PendingCreation = {
   hash: Hash;
+  cid?: string;
+};
+
+type PendingFunding = {
+  hash: Hash;
+  jobAddress?: Address;
   cid?: string;
 };
 
@@ -135,13 +142,14 @@ function draftFromMetadata(metadata: JobMetadataV1): FormDraft {
   };
 }
 
-function locationHints(search: string): { jobAddress?: Address; metadataCid?: string; createHash?: Hash } {
+function locationHints(search: string): { jobAddress?: Address; metadataCid?: string; createHash?: Hash; fundHash?: Hash } {
   const params = new URLSearchParams(search);
   const candidate = params.get("job");
   return {
     jobAddress: candidate !== null && isAddress(candidate) ? candidate : undefined,
     metadataCid: params.get("cid") ?? undefined,
     createHash: params.get("createTx")?.startsWith("0x") ? params.get("createTx") as Hash : undefined,
+    fundHash: params.get("fundTx")?.startsWith("0x") ? params.get("fundTx") as Hash : undefined,
   };
 }
 
@@ -165,6 +173,11 @@ export function NewJobPage() {
     hash: hints.createHash,
     cid: hints.metadataCid ?? initialState?.metadataCid,
   } : undefined);
+  const [pendingFunding, setPendingFunding] = useState<PendingFunding | undefined>(() => hints.fundHash ? {
+    hash: hints.fundHash,
+    jobAddress: hints.jobAddress ?? initialState?.jobAddress,
+    cid: hints.metadataCid ?? initialState?.metadataCid,
+  } : undefined);
   const [metadataUnavailable, setMetadataUnavailable] = useState(false);
   const [stage, setStage] = useState<CreateStage>("idle");
   const [workflowError, setWorkflowError] = useState<string | undefined>();
@@ -177,7 +190,7 @@ export function NewJobPage() {
     try { return sum + parseUsdcAmount(milestone.amountUsdc); } catch { return sum; }
   }, 0n), [draft.milestones]);
 
-  async function findVerifiedJob(account: Address, input: { address?: Address; cid?: string }): Promise<ConfirmedJob | undefined> {
+  async function findVerifiedJob(account: Address, input: { address?: Address; cid?: string; statuses?: readonly number[] }): Promise<ConfirmedJob | undefined> {
     const jobs = await publicClient.readContract({
       address: giwaAddresses.jobFactory,
       abi: JobFactoryAbi,
@@ -192,17 +205,19 @@ export function NewJobPage() {
         publicClient.readContract({ address: candidate, abi: EscrowJobAbi, functionName: "totalAmount" }),
         publicClient.readContract({ address: candidate, abi: EscrowJobAbi, functionName: "status" }),
       ]);
-      if (!isAddressEqual(client, account) || status !== 0 || (input.cid !== undefined && candidateCid !== input.cid)) continue;
-      return { address: candidate, client, metadataCid: candidateCid, totalAmount };
+      const allowedStatuses = input.statuses ?? [JOB_STATUS.Created];
+      if (!isAddressEqual(client, account) || !allowedStatuses.includes(status) || (input.cid !== undefined && candidateCid !== input.cid)) continue;
+      return { address: candidate, client, metadataCid: candidateCid, totalAmount, status };
     }
     return undefined;
   }
 
-  function persistRecovery(next: { cid?: string; job?: Address; createTx?: Hash }) {
+  function persistRecovery(next: { cid?: string; job?: Address; createTx?: Hash; fundTx?: Hash }) {
     const params = new URLSearchParams();
     if (next.cid) params.set("cid", next.cid);
     if (next.job) params.set("job", next.job);
     if (next.createTx) params.set("createTx", next.createTx);
+    if (next.fundTx) params.set("fundTx", next.fundTx);
     navigate({ pathname: location.pathname, search: params.size === 0 ? "" : `?${params.toString()}` }, {
       replace: true,
       state: { metadataCid: next.cid, jobAddress: next.job } satisfies NewJobLocationState,
@@ -214,14 +229,25 @@ export function NewJobPage() {
     setConfirmedJob(job);
     setMetadataCid(job.metadataCid);
     setPendingCreation(undefined);
+    if (job.status === JOB_STATUS.Funded) setPendingFunding(undefined);
     setMetadataUnavailable(false);
-    persistRecovery({ cid: job.metadataCid, job: job.address });
+    persistRecovery({ cid: job.metadataCid, job: job.address, fundTx: job.status === JOB_STATUS.Funded ? undefined : pendingFunding?.hash });
     try {
       const metadata = await fetchJobMetadata(job.metadataCid);
       if (workflowGeneration.current === generation && accountRef.current === account) setDraft(draftFromMetadata(metadata));
     } catch {
       if (workflowGeneration.current === generation && accountRef.current === account) setMetadataUnavailable(true);
     }
+    return workflowGeneration.current === generation && accountRef.current === account;
+  }
+
+  async function completeFundedJob(job: ConfirmedJob, account: Address, generation: number): Promise<boolean> {
+    if (job.status !== JOB_STATUS.Funded || !await adoptConfirmedJob(job, account, generation)) return false;
+    if (workflowGeneration.current !== generation || accountRef.current !== account) return false;
+    setStage("complete");
+    setWorkflowError(undefined);
+    setProgressDetail("Funding is confirmed on GIWA Sepolia.");
+    await invalidateJobQueries(queryClient, { jobAddress: job.address, accounts: [account] });
     return workflowGeneration.current === generation && accountRef.current === account;
   }
 
@@ -232,6 +258,7 @@ export function NewJobPage() {
     setConfirmedJob(undefined);
     setMetadataCid(undefined);
     setPendingCreation(undefined);
+    setPendingFunding(undefined);
     setMetadataUnavailable(false);
     setHashes({});
     setErrors({});
@@ -253,11 +280,14 @@ export function NewJobPage() {
         const hintedCid = pendingCreation?.cid ?? hints.metadataCid ?? initialState?.metadataCid;
         if (!hintedJob && !hintedCid) return;
         const recovered = hintedJob
-          ? await findVerifiedJob(account, { address: hintedJob, cid: hintedCid })
+          ? await findVerifiedJob(account, { address: hintedJob, cid: hintedCid, statuses: [JOB_STATUS.Created, JOB_STATUS.Funded] })
           : hintedCid
-            ? await findVerifiedJob(account, { cid: hintedCid })
+            ? await findVerifiedJob(account, { cid: hintedCid, statuses: [JOB_STATUS.Created, JOB_STATUS.Funded] })
             : undefined;
-        if (!cancelled && recovered) await adoptConfirmedJob(recovered, account, generation);
+        if (!cancelled && recovered) {
+          if (recovered.status === JOB_STATUS.Funded) await completeFundedJob(recovered, account, generation);
+          else await adoptConfirmedJob(recovered, account, generation);
+        }
       } catch {
         // The route remains usable for a new job while the RPC is unavailable.
       }
@@ -275,12 +305,69 @@ export function NewJobPage() {
   }
 
   async function runWorkflow() {
-    if (!canWrite || !address || isSubmitting) return;
+    if (!canWrite || !address || isSubmitting || stage === "complete") return;
     const account = address;
     const generation = ++workflowGeneration.current;
     const stillCurrent = () => workflowGeneration.current === generation && accountRef.current === account;
     setWorkflowError(undefined);
     let fundingJob = confirmedJob;
+    if (pendingFunding) {
+      const pending = pendingFunding;
+      if (!pending.jobAddress) {
+        setStage("error");
+        setWorkflowError("The submitted funding transaction is missing its escrow identity. Keep this route open and check the transaction before posting another job.");
+        return;
+      }
+      setIsSubmitting(true);
+      const verifyFundingStatus = () => findVerifiedJob(account, {
+        address: pending.jobAddress,
+        cid: pending.cid,
+        statuses: [JOB_STATUS.Created, JOB_STATUS.Funded],
+      });
+      try {
+        const beforeReceipt = await verifyFundingStatus();
+        if (!stillCurrent()) return;
+        if (beforeReceipt?.status === JOB_STATUS.Funded) {
+          await completeFundedJob(beforeReceipt, account, generation);
+          return;
+        }
+        if (!beforeReceipt) throw new Error("Funding escrow could not be verified.");
+        fundingJob = beforeReceipt;
+        await adoptConfirmedJob(beforeReceipt, account, generation);
+        setStage("fund");
+        setProgressDetail("Checking the submitted funding transaction on GIWA Sepolia…");
+        const receipt = await publicClient.waitForTransactionReceipt({ hash: pending.hash });
+        if (!stillCurrent()) return;
+        const afterReceipt = await verifyFundingStatus();
+        if (afterReceipt?.status === JOB_STATUS.Funded) {
+          await completeFundedJob(afterReceipt, account, generation);
+          return;
+        }
+        if (receipt.status !== "success") {
+          setPendingFunding(undefined);
+          persistRecovery({ cid: beforeReceipt.metadataCid, job: beforeReceipt.address });
+          setStage("error");
+          setWorkflowError("Funding transaction was reverted on GIWA Sepolia. You can try funding again.");
+          setIsSubmitting(false);
+          return;
+        }
+        setStage("error");
+        setWorkflowError("The submitted funding receipt has not produced a funded escrow yet. Keep checking this transaction before trying again.");
+        setIsSubmitting(false);
+        return;
+      } catch {
+        if (!stillCurrent()) return;
+        const afterFailure = await verifyFundingStatus().catch(() => undefined);
+        if (afterFailure?.status === JOB_STATUS.Funded) {
+          await completeFundedJob(afterFailure, account, generation);
+          return;
+        }
+        setStage("error");
+        setWorkflowError("Funding is still pending or its receipt is unavailable. Check the submitted transaction before trying again.");
+        setIsSubmitting(false);
+        return;
+      }
+    }
     if (!fundingJob && pendingCreation) {
       const pending = pendingCreation;
       if (!pending.cid) {
@@ -472,6 +559,7 @@ export function NewJobPage() {
       }
     }
 
+    let submittedFunding: PendingFunding | undefined;
     try {
       setStage("fund");
       setProgressDetail("Confirm funding in your wallet.");
@@ -480,6 +568,9 @@ export function NewJobPage() {
           const hash = await writeContractAsync(request as never);
           if (!stillCurrent()) throw new Error("Wallet account changed before funding was submitted.");
           setHashes((current) => ({ ...current, fund: hash }));
+          submittedFunding = { hash, jobAddress: confirmedAddress, cid: fundingJob.metadataCid };
+          setPendingFunding(submittedFunding);
+          persistRecovery({ cid: fundingJob.metadataCid, job: confirmedAddress, fundTx: hash });
           setProgressDetail("Funding submitted. Waiting for the GIWA receipt…");
           return hash;
         },
@@ -493,22 +584,43 @@ export function NewJobPage() {
       });
       if (!stillCurrent()) return;
       setHashes((current) => ({ ...current, fund: funded.hash }));
+      setPendingFunding(undefined);
+      persistRecovery({ cid: fundingJob.metadataCid, job: confirmedAddress });
       setStage("complete");
       setProgressDetail("Funding receipt confirmed. The escrow is available on-chain.");
       await invalidateJobQueries(queryClient, { jobAddress: confirmedAddress, accounts: [account] });
     } catch (error) {
       if (!stillCurrent()) return;
-      setStage("error");
-      setWorkflowError(errorMessage(error, "fund"));
+      if (!submittedFunding) {
+        setStage("error");
+        setWorkflowError(errorMessage(error, "fund"));
+      } else {
+        const recovered = await findVerifiedJob(account, {
+          address: submittedFunding.jobAddress,
+          cid: submittedFunding.cid,
+          statuses: [JOB_STATUS.Created, JOB_STATUS.Funded],
+        }).catch(() => undefined);
+        if (recovered?.status === JOB_STATUS.Funded) {
+          await completeFundedJob(recovered, account, generation);
+        } else if (/did not receive a successful receipt/i.test(error instanceof Error ? error.message : "")) {
+          setPendingFunding(undefined);
+          persistRecovery({ cid: fundingJob.metadataCid, job: confirmedAddress });
+          setStage("error");
+          setWorkflowError("Funding transaction was reverted on GIWA Sepolia. You can try funding again.");
+        } else {
+          setStage("error");
+          setWorkflowError("Funding is still pending or its receipt is unavailable. Check the submitted transaction before trying again.");
+        }
+      }
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  const draftLocked = Boolean(confirmedJob || pendingCreation);
+  const draftLocked = Boolean(confirmedJob || pendingCreation || pendingFunding);
   const displayedTotal = confirmedJob?.totalAmount ?? liveTotal;
-  const retryingMetadata = stage === "error" && !confirmedJob && !pendingCreation && workflowError?.startsWith("Metadata upload failed") === true;
-  const actionLabel = pendingCreation ? "Check submitted creation" : retryingMetadata ? "Retry metadata upload" : confirmedJob && stage !== "complete" ? "Finish funding" : "Create and fund escrow";
+  const retryingMetadata = stage === "error" && !confirmedJob && !pendingCreation && !pendingFunding && workflowError?.startsWith("Metadata upload failed") === true;
+  const actionLabel = stage === "complete" ? "Escrow funded" : pendingCreation ? "Check submitted creation" : pendingFunding ? "Check submitted funding" : retryingMetadata ? "Retry metadata upload" : confirmedJob ? "Finish funding" : "Create and fund escrow";
 
   return (
     <div className="dashboard-page new-job-page">
@@ -557,7 +669,7 @@ export function NewJobPage() {
           {errors.total || errors.form ? <p className="new-job-error" role="alert">{errors.total ?? errors.form}</p> : null}
           <p className="new-job-helper">MockUSDC is approved for this exact total, then transferred only after the approval receipt confirms.</p>
           {confirmedJob ? <p className="new-job-address">Escrow address: <code>{confirmedJob.address}</code></p> : null}
-          <button className="btn-primary new-job-submit-button" type="submit" disabled={!canWrite || isSubmitting}>
+          <button className="btn-primary new-job-submit-button" type="submit" disabled={!canWrite || isSubmitting || stage === "complete"}>
             {isSubmitting ? "Confirm in wallet…" : actionLabel}
           </button>
           {!canWrite ? <p className="new-job-helper">Connect a wallet on GIWA Sepolia to create an escrow.</p> : null}
