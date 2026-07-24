@@ -1,8 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { EscrowJobAbi } from "@giglock/shared";
-import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { formatUnits, isAddress, type Hash, type Hex } from "viem";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { formatUnits, isAddress, type Address, type Hash, type Hex } from "viem";
 import { useWriteContract } from "wagmi";
 import { ACTIVE_CHAIN_ID, publicClient } from "../lib/wagmi.js";
 import { EvidencePanel } from "../features/jobs/components/EvidencePanel.js";
@@ -77,6 +77,9 @@ export function JobDetailPage() {
   const queryClient = useQueryClient();
   const { address: account, canWrite } = useWalletWriteAccess();
   const { writeContractAsync } = useWriteContract();
+  const walletGeneration = useRef(0);
+  const accountRef = useRef(account);
+  const canWriteRef = useRef(canWrite);
   const jobAddress = routeAddress && isAddress(routeAddress) ? routeAddress : undefined;
   const jobQuery = useQuery({
     queryKey: jobAddress ? jobsKeys.detail(jobAddress) : ["jobs", ACTIVE_CHAIN_ID, "detail", "invalid"],
@@ -87,6 +90,14 @@ export function JobDetailPage() {
   const [pending, setPending] = useState<PendingAction | undefined>(() => pendingFromSearch(location.search));
   const [feedback, setFeedback] = useState<string | undefined>();
   const [lastHash, setLastHash] = useState<Hash | undefined>();
+
+  useEffect(() => {
+    if (accountRef.current !== account || canWriteRef.current !== canWrite) {
+      walletGeneration.current += 1;
+      accountRef.current = account;
+      canWriteRef.current = canWrite;
+    }
+  }, [account, canWrite]);
 
   const job = jobQuery.data;
   const actions = useMemo(
@@ -114,10 +125,18 @@ export function JobDetailPage() {
     navigate({ pathname: location.pathname, search: params.size ? `?${params.toString()}` : "" }, { replace: true });
   }
 
-  async function refreshAfterSuccess(hash: Hash) {
+  async function refreshAfterSuccess(hash: Hash, action: WorkflowAction) {
     setLastHash(hash);
     updatePending(undefined);
-    await invalidateJobQueries(queryClient, { jobAddress, accounts: account ? [account] : [] });
+    const accounts = [
+      ...(account ? [account] : []),
+      ...(action === "confirm" ? [job?.worker] : []),
+    ].filter((value): value is Address => value !== undefined);
+    await invalidateJobQueries(queryClient, {
+      jobAddress,
+      accounts,
+      workers: action === "accept" && account ? [account] : [],
+    });
     await jobQuery.refetch();
   }
 
@@ -135,7 +154,7 @@ export function JobDetailPage() {
           setFeedback(transactionError(recovered.action, new Error("reverted receipt")));
           return;
         }
-        await refreshAfterSuccess(recovered.hash);
+        await refreshAfterSuccess(recovered.hash, recovered.action);
         if (!cancelled) setFeedback("Transaction confirmed on GIWA Sepolia. Job data has refreshed.");
       } catch (error) {
         if (!cancelled) setFeedback(transactionError(recovered.action, error));
@@ -163,7 +182,7 @@ export function JobDetailPage() {
     };
     try {
       const result = action === "fund" ? await runFund(input) : action === "accept" ? await runAccept(input) : await runConfirm(input);
-      await refreshAfterSuccess(result.hash);
+      await refreshAfterSuccess(result.hash, action);
       setFeedback("Transaction confirmed on GIWA Sepolia. Job data has refreshed.");
     } catch (error) {
       if (hash) setLastHash(hash);
@@ -175,7 +194,18 @@ export function JobDetailPage() {
   async function submitEvidence(file: File) {
     if (!job || !jobAddress || !account || !canWrite || pending || pendingMilestone < 0) return;
     setFeedback(undefined);
+    const uploadAccount = account;
+    const uploadGeneration = walletGeneration.current;
     const { pin, proofHash } = await uploadEvidence(file);
+    if (
+      walletGeneration.current !== uploadGeneration ||
+      accountRef.current !== uploadAccount ||
+      !canWriteRef.current
+    ) {
+      const message = "Your wallet or network changed while evidence was uploading. Reconnect and try again.";
+      setFeedback(message);
+      throw new Error(message);
+    }
     let hash: Hash | undefined;
     try {
       const result = await runSubmitProof({
@@ -193,7 +223,7 @@ export function JobDetailPage() {
           chainId: 91342,
         },
       });
-      await refreshAfterSuccess(result.hash);
+      await refreshAfterSuccess(result.hash, "submit-proof");
       setFeedback(`Evidence CID ${pin.cid} is confirmed on-chain.`);
     } catch (error) {
       if (hash) setLastHash(hash);
@@ -209,8 +239,8 @@ export function JobDetailPage() {
   const title = job.metadata?.title ?? `Escrow ${compactAddress(job.address)}`;
   const selectedPending = pendingMilestone >= 0 ? job.milestones[pendingMilestone] : undefined;
   const selectedSubmitted = submittedMilestone >= 0 ? job.milestones[submittedMilestone] : undefined;
-  const selectedMilestoneIndex = selectedPending ? pendingMilestone : submittedMilestone;
-  const selectedTitle = selectedMilestoneIndex >= 0 ? job.metadata?.milestones[selectedMilestoneIndex]?.title ?? `Milestone ${selectedMilestoneIndex + 1}` : "Milestone";
+  const pendingTitle = pendingMilestone >= 0 ? job.metadata?.milestones[pendingMilestone]?.title ?? `Milestone ${pendingMilestone + 1}` : "Milestone";
+  const submittedTitle = submittedMilestone >= 0 ? job.metadata?.milestones[submittedMilestone]?.title ?? `Milestone ${submittedMilestone + 1}` : "Milestone";
   const actionPending = pending !== undefined;
 
   return (
@@ -242,7 +272,7 @@ export function JobDetailPage() {
 
       {selectedPending && actions.includes("submit-proof") ? (
         <EvidencePanel
-          milestoneTitle={selectedTitle}
+          milestoneTitle={pendingTitle}
           proofCid=""
           proofHash={selectedPending[2] as Hex}
           canSubmit
@@ -253,7 +283,7 @@ export function JobDetailPage() {
 
       {selectedSubmitted ? (
         <EvidencePanel
-          milestoneTitle={selectedTitle}
+          milestoneTitle={submittedTitle}
           proofCid={selectedSubmitted[3]}
           proofHash={selectedSubmitted[2] as Hex}
           canSubmit={false}
@@ -262,9 +292,10 @@ export function JobDetailPage() {
         />
       ) : null}
 
-      {actions.filter((action) => action !== "submit-proof").length > 0 ? (
+      {actions.filter((action) => action !== "submit-proof" && action !== "fund").length > 0 || actions.includes("fund") ? (
         <section className="job-detail-action" aria-label="Available job action">
-          {actions.filter((action) => action !== "submit-proof").map((action) => (
+          {actions.includes("fund") ? <Link className="btn-primary" to={`/app/jobs/new?job=${jobAddress}`}>Recover funding</Link> : null}
+          {actions.filter((action) => action !== "submit-proof" && action !== "fund").map((action) => (
             <button
               className="btn-primary"
               disabled={!canWrite || actionPending}
@@ -273,7 +304,7 @@ export function JobDetailPage() {
               onClick={() => void runAction(action, {
                 address: jobAddress,
                 abi: EscrowJobAbi,
-                functionName: action === "fund" ? "fundJob" : action === "accept" ? "acceptJob" : "confirmMilestone",
+                functionName: action === "accept" ? "acceptJob" : "confirmMilestone",
                 args: action === "confirm" && submittedMilestone >= 0 ? [BigInt(submittedMilestone)] : undefined,
                 chainId: 91342,
               })}

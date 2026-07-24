@@ -121,6 +121,17 @@ describe("job transaction workflows", () => {
     expect(queryClient.getQueryState(jobsKeys.balances(otherFactory))?.isInvalidated).toBe(false);
   });
 
+  it("invalidates exact worker-list keys without touching another worker's jobs", async () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(jobsKeys.worker(account), "accepted job");
+    queryClient.setQueryData(jobsKeys.worker(otherFactory), "other worker job");
+
+    await invalidateJobQueries(queryClient, { workers: [account] });
+
+    expect(queryClient.getQueryState(jobsKeys.worker(account))?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(jobsKeys.worker(otherFactory))?.isInvalidated).toBe(false);
+  });
+
   it("does not report creation success before its receipt is confirmed", async () => {
     let resolveReceipt: (receipt: TestReceipt) => void;
     const waitForReceipt = vi.fn(

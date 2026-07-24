@@ -90,12 +90,13 @@ export function decodeCreatedJobAddress(
 
 export async function invalidateJobQueries(
   queryClient: Invalidator,
-  input: { jobAddress?: Address; accounts?: Address[] },
+  input: { jobAddress?: Address; accounts?: Address[]; workers?: Address[] },
 ): Promise<void> {
   const invalidations: Array<{ queryKey: readonly unknown[]; exact?: boolean }> = [
     { queryKey: jobsKeys.all, exact: true },
     ...(input.jobAddress === undefined ? [] : [{ queryKey: jobsKeys.detail(input.jobAddress), exact: true }]),
     ...(input.accounts ?? []).map((account) => ({ queryKey: jobsKeys.balances(account), exact: true })),
+    ...(input.workers ?? []).map((account) => ({ queryKey: jobsKeys.worker(account), exact: true })),
   ];
   await Promise.all(invalidations.map((entry) => queryClient.invalidateQueries(entry)));
 }

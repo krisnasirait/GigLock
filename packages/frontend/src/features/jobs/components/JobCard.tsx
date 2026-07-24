@@ -1,4 +1,5 @@
 import { formatUnits } from "viem";
+import { Link } from "react-router-dom";
 import { MILESTONE_STATUS } from "../model.js";
 import type { JobChainSnapshot } from "../queries.js";
 import { JobStatusBadge } from "./JobStatusBadge.js";
@@ -23,7 +24,7 @@ export function JobCard({ job }: { job: JobChainSnapshot }) {
       <div className="job-card-header">
         <div>
           <p className="job-card-address">{compactAddress(job.address)}</p>
-          <h3>{title}</h3>
+          <h3><Link to={`/app/jobs/${job.address}`}>{title}</Link></h3>
         </div>
         <JobStatusBadge status={job.status} />
       </div>
@@ -43,6 +44,10 @@ export function JobCard({ job }: { job: JobChainSnapshot }) {
       </dl>
       {job.metadataError ? <p className="job-card-note">Metadata is temporarily unavailable; on-chain escrow data is shown.</p> : null}
       <TransactionProgress status={job.status} milestones={job.milestones} />
+      <div className="job-card-links">
+        <Link to={`/app/jobs/${job.address}`}>View job</Link>
+        {job.status === 0 ? <Link to={`/app/jobs/new?job=${job.address}`}>Recover funding</Link> : null}
+      </div>
     </article>
   );
 }

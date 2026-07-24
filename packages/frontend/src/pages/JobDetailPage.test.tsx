@@ -20,6 +20,7 @@ const testState = vi.hoisted(() => ({
   runAccept: vi.fn(),
   runSubmitProof: vi.fn(),
   runConfirm: vi.fn(),
+  invalidateJobQueries: vi.fn(),
   uploadEvidence: vi.fn(),
   publicClient: { waitForTransactionReceipt: vi.fn() },
 }));
@@ -51,7 +52,7 @@ vi.mock("../features/jobs/transactions.js", () => ({
   runAccept: testState.runAccept,
   runSubmitProof: testState.runSubmitProof,
   runConfirm: testState.runConfirm,
-  invalidateJobQueries: vi.fn(),
+  invalidateJobQueries: testState.invalidateJobQueries,
 }));
 
 vi.mock("../lib/wagmi.js", () => ({ ACTIVE_CHAIN_ID: 91342, publicClient: testState.publicClient }));
@@ -78,15 +79,20 @@ function snapshot(status: number, milestoneStatus: number = MILESTONE_STATUS.Pen
   };
 }
 
-function renderPage() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+function PageTree({ queryClient }: { queryClient: QueryClient }) {
+  return (
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[`/app/jobs/${jobAddress}`]}>
         <Routes><Route path="/app/jobs/:address" element={<JobDetailPage />} /></Routes>
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+}
+
+function renderPage() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const rendered = render(<PageTree queryClient={queryClient} />);
+  return { ...rendered, queryClient, refresh: () => rendered.rerender(<PageTree queryClient={queryClient} />) };
 }
 
 describe("JobDetailPage action visibility", () => {
@@ -98,6 +104,7 @@ describe("JobDetailPage action visibility", () => {
     testState.runAccept.mockResolvedValue({ hash: "0xaccept" });
     testState.runSubmitProof.mockResolvedValue({ hash: "0xproof" });
     testState.runConfirm.mockResolvedValue({ hash: "0xconfirm" });
+    testState.invalidateJobQueries.mockResolvedValue(undefined);
     testState.uploadEvidence.mockResolvedValue({ pin: { cid, url: `https://w3s.link/ipfs/${cid}` }, proofHash });
   });
 
@@ -105,7 +112,8 @@ describe("JobDetailPage action visibility", () => {
 
   it("shows the client a recovery-safe funding route only for a Created escrow", async () => {
     renderPage();
-    expect(await screen.findByRole("button", { name: "Fund escrow" })).toBeTruthy();
+    const recovery = await screen.findByRole("link", { name: "Recover funding" });
+    expect(recovery.getAttribute("href")).toBe(`/app/jobs/new?job=${jobAddress}`);
     expect(screen.queryByRole("button", { name: /Accept job|Submit evidence|Confirm release/ })).toBeNull();
   });
 
@@ -115,6 +123,16 @@ describe("JobDetailPage action visibility", () => {
     renderPage();
     expect(await screen.findByRole("button", { name: "Accept job" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Fund escrow|Submit evidence|Confirm release/ })).toBeNull();
+  });
+
+  it("invalidates the accepting worker's exact worker list after an accepted receipt", async () => {
+    testState.wallet.address = stranger;
+    testState.snapshot = snapshot(JOB_STATUS.Funded);
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Accept job" }));
+    await waitFor(() => expect(testState.invalidateJobQueries).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      workers: [stranger],
+    })));
   });
 
   it("shows the assigned worker a 10 MiB evidence submission action for a pending milestone", async () => {
@@ -132,6 +150,39 @@ describe("JobDetailPage action visibility", () => {
     expect(await screen.findByText(proofHash)).toBeTruthy();
     expect(screen.getByRole("link", { name: "Open evidence in IPFS gateway" }).getAttribute("href")).toBe(`https://w3s.link/ipfs/${cid}`);
     expect(screen.getByRole("button", { name: "Confirm release" })).toBeTruthy();
+  });
+
+  it("invalidates the worker balance after a client confirmation receipt", async () => {
+    testState.snapshot = snapshot(JOB_STATUS.InProgress, MILESTONE_STATUS.Submitted, cid);
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm release" }));
+    await waitFor(() => expect(testState.invalidateJobQueries).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      accounts: [client, worker],
+    })));
+  });
+
+  it("uses the submitted milestone's title, proof, and id when another milestone is still pending", async () => {
+    testState.snapshot = {
+      ...snapshot(JOB_STATUS.InProgress),
+      metadata: {
+        ...snapshot(JOB_STATUS.InProgress).metadata,
+        milestones: [
+          { title: "First proof", description: "Review the first delivery.", amountUsdc: "10" },
+          { title: "Second delivery", description: "Await the second delivery.", amountUsdc: "15.25" },
+        ],
+      },
+      milestones: [
+        [10_000_000n, MILESTONE_STATUS.Submitted, proofHash, cid, 0n, 0n],
+        [15_250_000n, MILESTONE_STATUS.Pending, `0x${"00".repeat(32)}`, "", 0n, 0n],
+      ],
+    };
+    renderPage();
+    expect(await screen.findByLabelText("Evidence for First proof")).toBeTruthy();
+    expect(screen.getByText(proofHash)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm release" }));
+    await waitFor(() => expect(testState.runConfirm).toHaveBeenCalledWith(expect.objectContaining({
+      request: expect.objectContaining({ args: [0n] }),
+    })));
   });
 
   it("keeps confirmation usable when an on-chain proof CID has no safe gateway URL", async () => {
@@ -166,6 +217,41 @@ describe("JobDetailPage action visibility", () => {
         chainId: 91342,
       }),
     }));
+  });
+
+  it("does not request a wallet write after the worker account changes during evidence upload", async () => {
+    let resolveUpload: (value: { pin: { cid: string; url: string }; proofHash: `0x${string}` }) => void;
+    testState.wallet.address = worker;
+    testState.snapshot = snapshot(JOB_STATUS.InProgress);
+    testState.uploadEvidence.mockImplementationOnce(() => new Promise((resolve) => { resolveUpload = resolve; }));
+    const view = renderPage();
+    const file = new File(["delivery"], "delivery.txt", { type: "text/plain" });
+    fireEvent.change(await screen.findByLabelText("Evidence for Final visual", { selector: "input" }), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit evidence" }));
+    await waitFor(() => expect(testState.uploadEvidence).toHaveBeenCalledWith(file));
+    testState.wallet.address = stranger;
+    view.refresh();
+    await waitFor(() => expect(screen.queryByLabelText("Evidence for Final visual")).toBeNull());
+    resolveUpload!({ pin: { cid, url: `https://w3s.link/ipfs/${cid}` }, proofHash });
+    expect(await screen.findByText(/wallet or network changed while evidence was uploading/i)).toBeTruthy();
+    expect(testState.runSubmitProof).not.toHaveBeenCalled();
+  });
+
+  it("does not request a wallet write after the network changes during evidence upload", async () => {
+    let resolveUpload: (value: { pin: { cid: string; url: string }; proofHash: `0x${string}` }) => void;
+    testState.wallet.address = worker;
+    testState.snapshot = snapshot(JOB_STATUS.InProgress);
+    testState.uploadEvidence.mockImplementationOnce(() => new Promise((resolve) => { resolveUpload = resolve; }));
+    const view = renderPage();
+    const file = new File(["delivery"], "delivery.txt", { type: "text/plain" });
+    fireEvent.change(await screen.findByLabelText("Evidence for Final visual", { selector: "input" }), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit evidence" }));
+    await waitFor(() => expect(testState.uploadEvidence).toHaveBeenCalledWith(file));
+    testState.wallet.canWrite = false;
+    view.refresh();
+    resolveUpload!({ pin: { cid, url: `https://w3s.link/ipfs/${cid}` }, proofHash });
+    expect(await screen.findByText(/wallet or network changed while evidence was uploading/i)).toBeTruthy();
+    expect(testState.runSubmitProof).not.toHaveBeenCalled();
   });
 
   it("keeps on-chain participants, amounts, and milestones visible when IPFS metadata fails", async () => {

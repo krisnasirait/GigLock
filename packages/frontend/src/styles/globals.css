@@ -344,6 +344,10 @@
 .job-facts dt { margin: 0; }
 .job-facts dd { margin: 0.2rem 0 0; color: #e2e8f0; font-size: 0.88rem; }
 .job-card-note { margin: 0 0 0.75rem; font-size: 0.8rem; }
+.job-card-header h3 a, .job-card-links a { color: inherit; text-decoration: none; }
+.job-card-header h3 a:hover, .job-card-header h3 a:focus-visible, .job-card-links a:hover, .job-card-links a:focus-visible { color: #a5f3fc; text-decoration: underline; text-underline-offset: 0.2rem; }
+.job-card-links { display: flex; flex-wrap: wrap; gap: 0.9rem; margin-top: 0.9rem; font-size: 0.8rem; font-weight: 650; }
+.job-card-links a { color: #a5f3fc; }
 
 .job-detail-page { padding-bottom: 6.5rem; }
 .job-detail-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 1.25rem 0; overflow: hidden; border: 1px solid rgba(148, 163, 184, 0.16); border-radius: 12px; background: rgba(148, 163, 184, 0.16); }

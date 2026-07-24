@@ -16,6 +16,7 @@ export const jobsKeys = {
   all: jobsKeyPrefix,
   detail: (address: Address) => [...jobsKeyPrefix, "detail", address] as const,
   balances: (account: Address) => [...jobsKeyPrefix, "balances", account] as const,
+  worker: (account: Address) => [...jobsKeyPrefix, "worker", account] as const,
 };
 
 export type JobChainSnapshot = {

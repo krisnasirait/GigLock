@@ -81,7 +81,7 @@ export function AppDashboardPage() {
     staleTime: 15_000,
   });
   const workerJobsQuery = useQuery({
-    queryKey: [...jobsKeys.all, "worker", address] as const,
+    queryKey: jobsKeys.worker(address!),
     queryFn: () => loadWorkerJobs(address!),
     enabled: tab === "worker" && address !== undefined,
     staleTime: 15_000,

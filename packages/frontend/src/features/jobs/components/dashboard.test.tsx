@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { zeroAddress, type Address } from "viem";
 
@@ -61,7 +62,9 @@ function renderDashboard(queryClient = new QueryClient({ defaultOptions: { queri
     queryClient,
     ...render(
       <QueryClientProvider client={queryClient}>
-        <AppDashboardPage />
+        <MemoryRouter>
+          <AppDashboardPage />
+        </MemoryRouter>
       </QueryClientProvider>,
     ),
   };
@@ -214,7 +217,9 @@ describe("AppDashboardPage", () => {
     writeContractAsync.mockRejectedValueOnce(new Error("network unavailable"));
     rerender(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <AppDashboardPage />
+        <MemoryRouter>
+          <AppDashboardPage />
+        </MemoryRouter>
       </QueryClientProvider>,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Claim 1,000 test USDC" }));
@@ -242,20 +247,44 @@ describe("AppDashboardPage", () => {
 
   it("does not count a disputed milestone as complete on a job card", () => {
     render(
-      <JobCard
-        job={{
-          address: "0x2222222222222222222222222222222222222222",
-          status: 2,
-          client: account,
-          worker: account,
-          totalAmount: 1_000_000n,
-          metadataCid: "bafy-job",
-          milestones: [[1_000_000n, 3, ("0x" + "00".repeat(32)) as `0x${string}`, "", 0n, 0n]],
-        }}
-      />,
+      <MemoryRouter>
+        <JobCard
+          job={{
+            address: "0x2222222222222222222222222222222222222222",
+            status: 2,
+            client: account,
+            worker: account,
+            totalAmount: 1_000_000n,
+            metadataCid: "bafy-job",
+            milestones: [[1_000_000n, 3, ("0x" + "00".repeat(32)) as `0x${string}`, "", 0n, 0n]],
+          }}
+        />
+      </MemoryRouter>,
     );
 
     expect(screen.getByText("0/1 complete")).toBeTruthy();
+  });
+
+  it("links every job card to its details and Created jobs to funding recovery", () => {
+    const jobAddress = "0x2222222222222222222222222222222222222222";
+    render(
+      <MemoryRouter>
+        <JobCard
+          job={{
+            address: jobAddress,
+            status: 0,
+            client: account,
+            worker: zeroAddress,
+            totalAmount: 1_000_000n,
+            metadataCid: "bafy-job",
+            milestones: [],
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("link", { name: "View job" }).getAttribute("href")).toBe(`/app/jobs/${jobAddress}`);
+    expect(screen.getByRole("link", { name: "Recover funding" }).getAttribute("href")).toBe(`/app/jobs/new?job=${jobAddress}`);
   });
 
   it("does not show a cancelled escrow as a completed transaction path", () => {
