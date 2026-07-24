@@ -100,8 +100,8 @@ describe("job transaction workflows", () => {
       queryKey: jobsKeys.all,
       exact: true,
     });
-    expect(invalidateQueries).toHaveBeenNthCalledWith(2, { queryKey: jobsKeys.detail(job) });
-    expect(invalidateQueries).toHaveBeenNthCalledWith(3, { queryKey: jobsKeys.balances(account) });
+    expect(invalidateQueries).toHaveBeenNthCalledWith(2, { queryKey: jobsKeys.detail(job), exact: true });
+    expect(invalidateQueries).toHaveBeenNthCalledWith(3, { queryKey: jobsKeys.balances(account), exact: true });
   });
 
   it("keeps unrelated detail and balance entries valid in the real query cache", async () => {

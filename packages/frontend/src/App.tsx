@@ -5,6 +5,7 @@ import { BlockchainFooter } from './components/BlockchainFooter';
 import { HomePage } from './pages/HomePage';
 import { AppDashboardPage } from './pages/AppDashboardPage';
 import { NewJobPage } from './pages/NewJobPage';
+import { JobDetailPage } from './pages/JobDetailPage';
 import { PlaceholderPage } from './components/PlaceholderPage';
 
 export function App() {
@@ -76,6 +77,7 @@ export function App() {
               element={<AppDashboardPage />}
             />
             <Route path="/app/jobs/new" element={<NewJobPage />} />
+            <Route path="/app/jobs/:address" element={<JobDetailPage />} />
             <Route
               path="*"
               element={

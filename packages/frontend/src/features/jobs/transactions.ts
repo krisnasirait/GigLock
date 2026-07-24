@@ -94,8 +94,8 @@ export async function invalidateJobQueries(
 ): Promise<void> {
   const invalidations: Array<{ queryKey: readonly unknown[]; exact?: boolean }> = [
     { queryKey: jobsKeys.all, exact: true },
-    ...(input.jobAddress === undefined ? [] : [{ queryKey: jobsKeys.detail(input.jobAddress) }]),
-    ...(input.accounts ?? []).map((account) => ({ queryKey: jobsKeys.balances(account) })),
+    ...(input.jobAddress === undefined ? [] : [{ queryKey: jobsKeys.detail(input.jobAddress), exact: true }]),
+    ...(input.accounts ?? []).map((account) => ({ queryKey: jobsKeys.balances(account), exact: true })),
   ];
   await Promise.all(invalidations.map((entry) => queryClient.invalidateQueries(entry)));
 }

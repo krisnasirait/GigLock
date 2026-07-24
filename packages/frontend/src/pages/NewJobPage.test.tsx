@@ -376,7 +376,7 @@ describe("NewJobPage", () => {
 
     await screen.findByText("You cancelled funding in your wallet. Your created job is ready to finish funding.");
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["jobs", 91342], exact: true });
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["jobs", 91342, "detail", jobAddress] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["jobs", 91342, "detail", jobAddress], exact: true });
   });
 
   it("cancels an unconfirmed workflow when the connected account changes", async () => {
