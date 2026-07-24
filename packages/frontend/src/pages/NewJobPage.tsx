@@ -1,12 +1,12 @@
 import { addressesByChain, EscrowJobAbi, JobFactoryAbi, MockUSDCAbi } from "@giglock/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { formatUnits, type Address, type Hash } from "viem";
+import { formatUnits, isAddress, isAddressEqual, type Address, type Hash } from "viem";
 import { useWriteContract } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
-import { uploadJobMetadata } from "../features/jobs/ipfs.js";
+import { fetchJobMetadata, uploadJobMetadata } from "../features/jobs/ipfs.js";
 import { parseJobMetadata, parseUsdcAmount, type JobMetadataV1 } from "../features/jobs/model.js";
-import { invalidateJobQueries, runApprove, runCreate, runFund } from "../features/jobs/transactions.js";
+import { decodeCreatedJobAddress, invalidateJobQueries, runApprove, runCreate, runFund } from "../features/jobs/transactions.js";
 import { CreateJobProgress, type CreateStage } from "../features/jobs/components/CreateJobProgress.js";
 import { MilestoneEditor, type MilestoneDraft } from "../features/jobs/components/MilestoneEditor.js";
 import { WalletGate, useWalletWriteAccess } from "../features/jobs/components/WalletGate.js";
@@ -25,6 +25,13 @@ type FormDraft = {
   description: string;
   skills: string;
   milestones: MilestoneDraft[];
+};
+
+type ConfirmedJob = {
+  address: Address;
+  client: Address;
+  metadataCid: string;
+  totalAmount: bigint;
 };
 
 const initialMilestone = (): MilestoneDraft => ({
@@ -114,6 +121,25 @@ function draftFingerprint(metadata: JobMetadataV1): string {
   return JSON.stringify(metadata);
 }
 
+function draftFromMetadata(metadata: JobMetadataV1): FormDraft {
+  return {
+    title: metadata.title,
+    description: metadata.description,
+    skills: metadata.skills.join(", "),
+    milestones: metadata.milestones.map((milestone) => ({ id: crypto.randomUUID(), ...milestone })),
+  };
+}
+
+function locationHints(search: string): { jobAddress?: Address; metadataCid?: string; createHash?: Hash } {
+  const params = new URLSearchParams(search);
+  const candidate = params.get("job");
+  return {
+    jobAddress: candidate !== null && isAddress(candidate) ? candidate : undefined,
+    metadataCid: params.get("cid") ?? undefined,
+    createHash: params.get("createTx")?.startsWith("0x") ? params.get("createTx") as Hash : undefined,
+  };
+}
+
 export function NewJobPage() {
   const { address, canWrite } = useWalletWriteAccess();
   const { writeContractAsync } = useWriteContract();
@@ -121,13 +147,16 @@ export function NewJobPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const initialState = location.state as NewJobLocationState | null;
+  const hints = locationHints(location.search);
   const createdAtRef = useRef(new Date().toISOString());
   const pinnedMetadata = useRef(new Map<string, string>());
-  const isRecoveringNavigationState = useRef(Boolean(initialState?.jobAddress));
+  const accountRef = useRef(address);
+  const workflowGeneration = useRef(0);
   const [draft, setDraft] = useState<FormDraft>(emptyDraft);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [metadataCid, setMetadataCid] = useState<string | undefined>(initialState?.metadataCid);
-  const [jobAddress, setJobAddress] = useState<Address | undefined>(initialState?.jobAddress);
+  const [metadataCid, setMetadataCid] = useState<string | undefined>(hints.metadataCid ?? initialState?.metadataCid);
+  const [confirmedJob, setConfirmedJob] = useState<ConfirmedJob | undefined>();
+  const [pendingCreateHash, setPendingCreateHash] = useState<Hash | undefined>(hints.createHash);
   const [stage, setStage] = useState<CreateStage>("idle");
   const [workflowError, setWorkflowError] = useState<string | undefined>();
   const [hashes, setHashes] = useState<Partial<Record<"create" | "approve" | "fund", Hash>>>({});
@@ -139,51 +168,95 @@ export function NewJobPage() {
     try { return sum + parseUsdcAmount(milestone.amountUsdc); } catch { return sum; }
   }, 0n), [draft.milestones]);
 
+  async function findVerifiedJob(account: Address, input: { address?: Address; cid?: string }): Promise<ConfirmedJob | undefined> {
+    const jobs = await publicClient.readContract({
+      address: giwaAddresses.jobFactory,
+      abi: JobFactoryAbi,
+      functionName: "getJobsByClient",
+      args: [account],
+    });
+    const candidates = input.address === undefined ? jobs : jobs.filter((job) => isAddressEqual(job, input.address!));
+    for (const candidate of candidates) {
+      const [client, candidateCid, totalAmount, status] = await Promise.all([
+        publicClient.readContract({ address: candidate, abi: EscrowJobAbi, functionName: "client" }),
+        publicClient.readContract({ address: candidate, abi: EscrowJobAbi, functionName: "metadataCid" }),
+        publicClient.readContract({ address: candidate, abi: EscrowJobAbi, functionName: "totalAmount" }),
+        publicClient.readContract({ address: candidate, abi: EscrowJobAbi, functionName: "status" }),
+      ]);
+      if (!isAddressEqual(client, account) || status !== 0 || (input.cid !== undefined && candidateCid !== input.cid)) continue;
+      return { address: candidate, client, metadataCid: candidateCid, totalAmount };
+    }
+    return undefined;
+  }
+
+  function persistRecovery(next: { cid?: string; job?: Address; createTx?: Hash }) {
+    const params = new URLSearchParams();
+    if (next.cid) params.set("cid", next.cid);
+    if (next.job) params.set("job", next.job);
+    if (next.createTx) params.set("createTx", next.createTx);
+    navigate({ pathname: location.pathname, search: params.size === 0 ? "" : `?${params.toString()}` }, {
+      replace: true,
+      state: { metadataCid: next.cid, jobAddress: next.job } satisfies NewJobLocationState,
+    });
+  }
+
+  async function adoptConfirmedJob(job: ConfirmedJob, account: Address, generation: number): Promise<boolean> {
+    if (workflowGeneration.current !== generation || accountRef.current !== account) return false;
+    setConfirmedJob(job);
+    setMetadataCid(job.metadataCid);
+    setPendingCreateHash(undefined);
+    persistRecovery({ cid: job.metadataCid, job: job.address });
+    try {
+      const metadata = await fetchJobMetadata(job.metadataCid);
+      if (workflowGeneration.current === generation && accountRef.current === account) setDraft(draftFromMetadata(metadata));
+    } catch {
+      // Funding uses the verified chain total; metadata improves the read-only resume view only.
+    }
+    return workflowGeneration.current === generation && accountRef.current === account;
+  }
+
   useEffect(() => {
-    if (!address || !metadataCid || jobAddress) return;
+    if (accountRef.current === address) return;
+    accountRef.current = address;
+    workflowGeneration.current += 1;
+    setConfirmedJob(undefined);
+    setMetadataCid(undefined);
+    setPendingCreateHash(undefined);
+    setHashes({});
+    setErrors({});
+    setWorkflowError(undefined);
+    setProgressDetail(undefined);
+    setStage("idle");
+    setIsSubmitting(false);
+    persistRecovery({});
+  }, [address]);
+
+  useEffect(() => {
+    if (!address || confirmedJob) return;
     const account = address;
+    const generation = workflowGeneration.current;
     let cancelled = false;
     async function recoverFromChain() {
       try {
-        const jobs = await publicClient.readContract({
-          address: giwaAddresses.jobFactory,
-          abi: JobFactoryAbi,
-          functionName: "getJobsByClient",
-          args: [account],
-        });
-        for (const candidate of jobs) {
-          const candidateCid = await publicClient.readContract({
-            address: candidate,
-            abi: EscrowJobAbi,
-            functionName: "metadataCid",
-          });
-          if (!cancelled && candidateCid === metadataCid) {
-            setJobAddress(candidate);
-            navigate(".", { replace: true, state: { metadataCid, jobAddress: candidate } satisfies NewJobLocationState });
-            return;
-          }
-        }
+        const hintedJob = hints.jobAddress ?? initialState?.jobAddress;
+        const hintedCid = hints.metadataCid ?? initialState?.metadataCid;
+        const recovered = hintedJob
+          ? await findVerifiedJob(account, { address: hintedJob, cid: hintedCid })
+          : hintedCid
+            ? await findVerifiedJob(account, { cid: hintedCid })
+            : await (async () => {
+              const jobs = await publicClient.readContract({ address: giwaAddresses.jobFactory, abi: JobFactoryAbi, functionName: "getJobsByClient", args: [account] });
+              const created = (await Promise.all(jobs.map((job) => findVerifiedJob(account, { address: job })))).filter((job): job is ConfirmedJob => job !== undefined);
+              return created.length === 1 ? created[0] : undefined;
+            })();
+        if (!cancelled && recovered) await adoptConfirmedJob(recovered, account, generation);
       } catch {
-        // The user can still continue with the confirmed navigation state once their RPC reconnects.
+        // The route remains usable for a new job while the RPC is unavailable.
       }
     }
     void recoverFromChain();
     return () => { cancelled = true; };
-  }, [address, jobAddress, metadataCid, navigate]);
-
-  useEffect(() => {
-    if (!isRecoveringNavigationState.current || !jobAddress || !metadataCid) return;
-    let cancelled = false;
-    void publicClient.readContract({ address: jobAddress, abi: EscrowJobAbi, functionName: "metadataCid" })
-      .then((onChainCid) => {
-        if (!cancelled && onChainCid !== metadataCid) {
-          setJobAddress(undefined);
-          setWorkflowError("The saved escrow state could not be verified on-chain. No new escrow was created.");
-        }
-      })
-      .catch(() => undefined);
-    return () => { cancelled = true; };
-  }, [jobAddress, metadataCid]);
+  }, [address, confirmedJob, hints.jobAddress, hints.metadataCid, initialState?.jobAddress, initialState?.metadataCid]);
 
   function updateDraft(field: Exclude<keyof FormDraft, "milestones">, value: string) {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -193,78 +266,137 @@ export function NewJobPage() {
     setDraft((current) => ({ ...current, milestones: current.milestones.map((milestone) => milestone.id === id ? { ...milestone, [field]: value } : milestone) }));
   }
 
-  function persistRecovery(nextCid: string, nextJobAddress?: Address) {
-    if (nextJobAddress) isRecoveringNavigationState.current = false;
-    setMetadataCid(nextCid);
-    setJobAddress(nextJobAddress);
-    navigate(".", { replace: true, state: { metadataCid: nextCid, jobAddress: nextJobAddress } satisfies NewJobLocationState });
-  }
-
   async function runWorkflow() {
     if (!canWrite || !address || isSubmitting) return;
+    const account = address;
+    const generation = ++workflowGeneration.current;
+    const stillCurrent = () => workflowGeneration.current === generation && accountRef.current === account;
     setWorkflowError(undefined);
-    const validation = validateDraft(draft, createdAtRef.current);
-    setErrors(validation.errors);
-    if (!validation.metadata || !validation.amounts || validation.total === undefined) {
-      requestAnimationFrame(() => formRef.current?.querySelector<HTMLElement>("[aria-invalid='true']")?.focus());
-      return;
+    let fundingJob = confirmedJob;
+    let validation: ReturnType<typeof validateDraft> | undefined;
+    if (!fundingJob) {
+      validation = validateDraft(draft, createdAtRef.current);
+      setErrors(validation.errors);
+      if (!validation.metadata || !validation.amounts || validation.total === undefined) {
+        requestAnimationFrame(() => formRef.current?.querySelector<HTMLElement>("[aria-invalid='true']")?.focus());
+        return;
+      }
     }
     setIsSubmitting(true);
-    const fingerprint = draftFingerprint(validation.metadata);
-    let cid = metadataCid;
-    try {
-      if (!cid || pinnedMetadata.current.get(fingerprint) !== cid) {
-        const previousCid = pinnedMetadata.current.get(fingerprint);
-        if (previousCid) {
-          cid = previousCid;
-        } else {
-          setStage("metadata");
-          setProgressDetail("Pinning the canonical job metadata to IPFS…");
-          const pinned = await uploadJobMetadata(validation.metadata);
-          cid = pinned.cid;
-          pinnedMetadata.current.set(fingerprint, cid);
+    let cid = fundingJob?.metadataCid ?? metadataCid;
+    if (!fundingJob) {
+      try {
+        const fingerprint = draftFingerprint(validation!.metadata!);
+        if (!cid || pinnedMetadata.current.get(fingerprint) !== cid) {
+          const previousCid = pinnedMetadata.current.get(fingerprint);
+          if (previousCid) cid = previousCid;
+          else {
+            setStage("metadata");
+            setProgressDetail("Pinning the canonical job metadata to IPFS…");
+            const pinned = await uploadJobMetadata(validation!.metadata!);
+            cid = pinned.cid;
+            pinnedMetadata.current.set(fingerprint, cid);
+          }
+          if (!stillCurrent()) return;
+          setMetadataCid(cid);
+          persistRecovery({ cid, createTx: pendingCreateHash });
         }
-        persistRecovery(cid);
+      } catch (error) {
+        if (!stillCurrent()) return;
+        setStage("error");
+        setWorkflowError(errorMessage(error, "metadata"));
+        setIsSubmitting(false);
+        return;
       }
-    } catch (error) {
-      setStage("error");
-      setWorkflowError(errorMessage(error, "metadata"));
-      setIsSubmitting(false);
-      return;
+      try {
+        fundingJob = await findVerifiedJob(account, { cid });
+        if (!stillCurrent()) return;
+        if (fundingJob) await adoptConfirmedJob(fundingJob, account, generation);
+      } catch {
+        // A failed preflight is not evidence that a job exists; do not create until the RPC succeeds.
+        if (!stillCurrent()) return;
+        setStage("error");
+        setWorkflowError("Could not verify existing escrows on GIWA Sepolia. Try again before creating a new one.");
+        setIsSubmitting(false);
+        return;
+      }
     }
 
-    let confirmedAddress = jobAddress;
-    if (!confirmedAddress) {
+    if (!fundingJob && pendingCreateHash) {
+      try {
+        setStage("create");
+        setProgressDetail("Checking the submitted creation transaction on GIWA Sepolia…");
+        const receipt = await publicClient.waitForTransactionReceipt({ hash: pendingCreateHash });
+        if (receipt.status === "success") {
+          const createdAddress = decodeCreatedJobAddress(receipt, giwaAddresses.jobFactory);
+          fundingJob = await findVerifiedJob(account, { address: createdAddress, cid });
+          if (fundingJob && stillCurrent()) await adoptConfirmedJob(fundingJob, account, generation);
+        } else if (stillCurrent()) {
+          setPendingCreateHash(undefined);
+          persistRecovery({ cid });
+        }
+      } catch {
+        if (!stillCurrent()) return;
+        const found = await findVerifiedJob(account, { cid }).catch(() => undefined);
+        if (found) {
+          fundingJob = found;
+          await adoptConfirmedJob(found, account, generation);
+        } else {
+          setStage("error");
+          setWorkflowError("Creation is still pending or its receipt is unavailable. Check the submitted transaction before trying again.");
+          setIsSubmitting(false);
+          return;
+        }
+      }
+    }
+
+    if (!fundingJob) {
       try {
         setStage("create");
         setProgressDetail("Confirm escrow creation in your wallet.");
         const created = await runCreate({
           writeContract: async (request) => {
             const hash = await writeContractAsync(request as never);
+            if (!stillCurrent()) throw new Error("Wallet account changed before creation was submitted.");
             setHashes((current) => ({ ...current, create: hash }));
+            setPendingCreateHash(hash);
+            persistRecovery({ cid, createTx: hash });
             setProgressDetail("Escrow creation submitted. Waiting for the GIWA receipt…");
             return hash;
           },
           waitForReceipt: publicClient.waitForTransactionReceipt,
           factory: giwaAddresses.jobFactory,
-          request: {
-            address: giwaAddresses.jobFactory,
-            abi: JobFactoryAbi,
-            functionName: "createJob",
-            args: [validation.amounts, cid],
-            chainId: 91342,
-          },
+          request: { address: giwaAddresses.jobFactory, abi: JobFactoryAbi, functionName: "createJob", args: [validation!.amounts!, cid], chainId: 91342 },
         });
-        confirmedAddress = created.jobAddress;
+        if (!stillCurrent()) return;
+        const verified = await findVerifiedJob(account, { address: created.jobAddress, cid });
+        if (!verified) throw new Error("Confirmed create receipt could not be verified against the factory client job list.");
+        fundingJob = verified;
         setHashes((current) => ({ ...current, create: created.hash }));
-        persistRecovery(cid!, confirmedAddress);
+        await adoptConfirmedJob(verified, account, generation);
+        await invalidateJobQueries(queryClient, { jobAddress: verified.address });
       } catch (error) {
-        setStage("error");
-        setWorkflowError(errorMessage(error, "create"));
-        setIsSubmitting(false);
-        return;
+        if (!stillCurrent()) return;
+        const found = await findVerifiedJob(account, { cid }).catch(() => undefined);
+        if (found) {
+          fundingJob = found;
+          await adoptConfirmedJob(found, account, generation);
+          await invalidateJobQueries(queryClient, { jobAddress: found.address });
+        } else {
+          setStage("error");
+          setWorkflowError(errorMessage(error, "create"));
+          setIsSubmitting(false);
+          return;
+        }
       }
     }
+
+    if (!fundingJob || !stillCurrent()) {
+      setIsSubmitting(false);
+      return;
+    }
+    const confirmedAddress = fundingJob.address;
+    const total = fundingJob.totalAmount;
 
     let allowance = 0n;
     try {
@@ -272,18 +404,20 @@ export function NewJobPage() {
         address: giwaAddresses.mockUsdc,
         abi: MockUSDCAbi,
         functionName: "allowance",
-        args: [address, confirmedAddress],
+        args: [account, confirmedAddress],
       });
     } catch {
       // Approval is safe to request again; the receipt remains the source of truth for funding.
     }
-    if (allowance < validation.total) {
+    if (!stillCurrent()) return;
+    if (allowance < total) {
       try {
         setStage("approve");
         setProgressDetail("Confirm the exact MockUSDC approval in your wallet.");
         const approved = await runApprove({
           writeContract: async (request) => {
             const hash = await writeContractAsync(request as never);
+            if (!stillCurrent()) throw new Error("Wallet account changed before approval was submitted.");
             setHashes((current) => ({ ...current, approve: hash }));
             setProgressDetail("Approval submitted. Waiting for the GIWA receipt…");
             return hash;
@@ -293,12 +427,14 @@ export function NewJobPage() {
             address: giwaAddresses.mockUsdc,
             abi: MockUSDCAbi,
             functionName: "approve",
-            args: [confirmedAddress, validation.total],
+            args: [confirmedAddress, total],
             chainId: 91342,
           },
         });
+        if (!stillCurrent()) return;
         setHashes((current) => ({ ...current, approve: approved.hash }));
       } catch (error) {
+        if (!stillCurrent()) return;
         setStage("error");
         setWorkflowError(errorMessage(error, "approve"));
         setIsSubmitting(false);
@@ -312,6 +448,7 @@ export function NewJobPage() {
       const funded = await runFund({
         writeContract: async (request) => {
           const hash = await writeContractAsync(request as never);
+          if (!stillCurrent()) throw new Error("Wallet account changed before funding was submitted.");
           setHashes((current) => ({ ...current, fund: hash }));
           setProgressDetail("Funding submitted. Waiting for the GIWA receipt…");
           return hash;
@@ -324,11 +461,13 @@ export function NewJobPage() {
           chainId: 91342,
         },
       });
+      if (!stillCurrent()) return;
       setHashes((current) => ({ ...current, fund: funded.hash }));
       setStage("complete");
       setProgressDetail("Funding receipt confirmed. The escrow is available on-chain.");
-      await invalidateJobQueries(queryClient, { jobAddress: confirmedAddress, accounts: [address] });
+      await invalidateJobQueries(queryClient, { jobAddress: confirmedAddress, accounts: [account] });
     } catch (error) {
+      if (!stillCurrent()) return;
       setStage("error");
       setWorkflowError(errorMessage(error, "fund"));
     } finally {
@@ -336,8 +475,8 @@ export function NewJobPage() {
     }
   }
 
-  const retryingMetadata = stage === "error" && !jobAddress && workflowError?.startsWith("Metadata upload failed") === true;
-  const actionLabel = retryingMetadata ? "Retry metadata upload" : jobAddress && stage !== "complete" ? "Finish funding" : "Create and fund escrow";
+  const retryingMetadata = stage === "error" && !confirmedJob && workflowError?.startsWith("Metadata upload failed") === true;
+  const actionLabel = retryingMetadata ? "Retry metadata upload" : confirmedJob && stage !== "complete" ? "Finish funding" : "Create and fund escrow";
 
   return (
     <div className="dashboard-page new-job-page">
@@ -359,13 +498,13 @@ export function NewJobPage() {
             <p className="new-job-limit">All fields are stored in IPFS metadata.</p>
           </div>
           <label htmlFor="job-title">Job title</label>
-          <input className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-cyan-300" id="job-title" value={draft.title} maxLength={100} disabled={Boolean(jobAddress)} aria-invalid={errors.title ? true : undefined} aria-describedby={errors.title ? "job-title-error" : undefined} onChange={(event) => updateDraft("title", event.target.value)} />
+          <input className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-cyan-300" id="job-title" value={draft.title} maxLength={100} disabled={Boolean(confirmedJob)} aria-invalid={errors.title ? true : undefined} aria-describedby={errors.title ? "job-title-error" : undefined} onChange={(event) => updateDraft("title", event.target.value)} />
           {errors.title ? <p id="job-title-error" className="new-job-error">{errors.title}</p> : null}
           <label htmlFor="job-description">Job description</label>
-          <textarea className="mt-1 min-h-32 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-cyan-300" id="job-description" value={draft.description} maxLength={4000} disabled={Boolean(jobAddress)} aria-invalid={errors.description ? true : undefined} aria-describedby={errors.description ? "job-description-error" : undefined} onChange={(event) => updateDraft("description", event.target.value)} />
+          <textarea className="mt-1 min-h-32 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-cyan-300" id="job-description" value={draft.description} maxLength={4000} disabled={Boolean(confirmedJob)} aria-invalid={errors.description ? true : undefined} aria-describedby={errors.description ? "job-description-error" : undefined} onChange={(event) => updateDraft("description", event.target.value)} />
           {errors.description ? <p id="job-description-error" className="new-job-error">{errors.description}</p> : null}
           <label htmlFor="job-skills">Skills</label>
-          <input className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-cyan-300" id="job-skills" value={draft.skills} disabled={Boolean(jobAddress)} aria-invalid={errors.skills ? true : undefined} aria-describedby={errors.skills ? "job-skills-error job-skills-help" : "job-skills-help"} onChange={(event) => updateDraft("skills", event.target.value)} />
+          <input className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-cyan-300" id="job-skills" value={draft.skills} disabled={Boolean(confirmedJob)} aria-invalid={errors.skills ? true : undefined} aria-describedby={errors.skills ? "job-skills-error job-skills-help" : "job-skills-help"} onChange={(event) => updateDraft("skills", event.target.value)} />
           <p id="job-skills-help" className="new-job-helper">Separate up to 10 skills with commas. Each skill can be 1–32 characters.</p>
           {errors.skills ? <p id="job-skills-error" className="new-job-error">{errors.skills}</p> : null}
         </section>
@@ -376,7 +515,7 @@ export function NewJobPage() {
           onChange={updateMilestone}
           onAdd={() => setDraft((current) => current.milestones.length >= 10 ? current : { ...current, milestones: [...current.milestones, initialMilestone()] })}
           onRemove={(id) => setDraft((current) => current.milestones.length <= 1 ? current : { ...current, milestones: current.milestones.filter((milestone) => milestone.id !== id) })}
-          disabled={Boolean(jobAddress)}
+          disabled={Boolean(confirmedJob)}
         />
 
         <section className="new-job-submit card-glass rounded-xl p-5 sm:p-6" aria-label="Escrow funding">
@@ -384,7 +523,7 @@ export function NewJobPage() {
           <p className="new-job-total">Total escrow: {formatUnits(liveTotal, 6)} USDC</p>
           {errors.total || errors.form ? <p className="new-job-error" role="alert">{errors.total ?? errors.form}</p> : null}
           <p className="new-job-helper">MockUSDC is approved for this exact total, then transferred only after the approval receipt confirms.</p>
-          {jobAddress ? <p className="new-job-address">Escrow address: <code>{jobAddress}</code></p> : null}
+          {confirmedJob ? <p className="new-job-address">Escrow address: <code>{confirmedJob.address}</code></p> : null}
           <button className="btn-primary new-job-submit-button" type="submit" disabled={!canWrite || isSubmitting}>
             {isSubmitting ? "Confirm in wallet…" : actionLabel}
           </button>

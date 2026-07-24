@@ -15,6 +15,8 @@ const testState = vi.hoisted(() => ({
   runCreate: vi.fn(),
   runApprove: vi.fn(),
   runFund: vi.fn(),
+  fetchJobMetadata: vi.fn(),
+  chainJobExists: false,
   publicClient: {
     readContract: vi.fn(),
     waitForTransactionReceipt: vi.fn(),
@@ -32,6 +34,7 @@ vi.mock("../features/jobs/components/WalletGate.js", () => ({
 
 vi.mock("../features/jobs/ipfs.js", () => ({
   uploadJobMetadata: testState.uploadJobMetadata,
+  fetchJobMetadata: testState.fetchJobMetadata,
 }));
 
 vi.mock("../features/jobs/transactions.js", async () => {
@@ -44,13 +47,30 @@ vi.mock("../lib/wagmi.js", () => ({ ACTIVE_CHAIN_ID: 91342, publicClient: testSt
 import { NewJobPage } from "./NewJobPage.js";
 
 const jobAddress = "0x2222222222222222222222222222222222222222" as Address;
+const metadataCid = "bafybeigdyrzt5v6xk4nfhj3x5w4y2w7brqv5aqhfvxbsqj4r2m5sjuyd2e";
+const metadata = {
+  schema: "giglock/job@1" as const,
+  title: "Illustrate the protocol update",
+  description: "Create a focused illustration for the upcoming protocol update announcement.",
+  skills: ["Illustration", "Figma"],
+  createdAt: "2026-07-24T00:00:00.000Z",
+  milestones: [{
+    title: "Create the final visual",
+    description: "Deliver an original illustration as high-resolution source assets.",
+    amountUsdc: "25.25",
+  }],
+};
 
-function renderPage() {
-  return render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MemoryRouter><NewJobPage /></MemoryRouter>
+function renderPage(initialEntries = ["/app/jobs/new"]) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return {
+    queryClient,
+    ...render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={initialEntries}><NewJobPage /></MemoryRouter>
     </QueryClientProvider>,
-  );
+    ),
+  };
 }
 
 async function fillValidForm(user = userEvent.setup()) {
@@ -67,11 +87,24 @@ describe("NewJobPage", () => {
   beforeEach(() => {
     testState.wallet.address = "0x1111111111111111111111111111111111111111" as Address;
     testState.wallet.canWrite = true;
-    testState.uploadJobMetadata.mockResolvedValue({ cid: "bafybeigdyrzt5v6xk4nfhj3x5w4y2w7brqv5aqhfvxbsqj4r2m5sjuyd2e", url: "https://gateway.test/metadata" });
-    testState.runCreate.mockResolvedValue({ hash: "0xcreate", jobAddress });
+    testState.chainJobExists = false;
+    testState.uploadJobMetadata.mockResolvedValue({ cid: metadataCid, url: "https://gateway.test/metadata" });
+    testState.fetchJobMetadata.mockResolvedValue(metadata);
+    testState.runCreate.mockImplementation(async () => {
+      testState.chainJobExists = true;
+      return { hash: "0xcreate", jobAddress };
+    });
     testState.runApprove.mockResolvedValue({ hash: "0xapprove" });
     testState.runFund.mockResolvedValue({ hash: "0xfund" });
-    testState.publicClient.readContract.mockResolvedValue(0n);
+    testState.publicClient.readContract.mockImplementation(({ functionName }: { functionName: string }) => {
+      if (functionName === "getJobsByClient") return Promise.resolve(testState.chainJobExists ? [jobAddress] : []);
+      if (functionName === "client") return Promise.resolve(testState.wallet.address);
+      if (functionName === "metadataCid") return Promise.resolve(metadataCid);
+      if (functionName === "totalAmount") return Promise.resolve(25_250_000n);
+      if (functionName === "status") return Promise.resolve(0);
+      if (functionName === "allowance") return Promise.resolve(0n);
+      return Promise.resolve(0n);
+    });
     testState.publicClient.waitForTransactionReceipt.mockResolvedValue({ status: "success" });
   });
 
@@ -178,5 +211,85 @@ describe("NewJobPage", () => {
     await screen.findByText("Escrow funded on GIWA Sepolia.");
     expect(testState.runCreate).toHaveBeenCalledTimes(1);
     expect(testState.runFund).toHaveBeenCalledTimes(2);
+  });
+
+  it("resumes a direct-navigation created escrow from verified chain data without validating an empty form", async () => {
+    testState.publicClient.readContract.mockImplementation(({ functionName }: { functionName: string }) => {
+      if (functionName === "getJobsByClient") return Promise.resolve([jobAddress]);
+      if (functionName === "client") return Promise.resolve(testState.wallet.address);
+      if (functionName === "metadataCid") return Promise.resolve(metadataCid);
+      if (functionName === "totalAmount") return Promise.resolve(25_250_000n);
+      if (functionName === "status") return Promise.resolve(0);
+      if (functionName === "allowance") return Promise.resolve(0n);
+      return Promise.resolve(0n);
+    });
+    const user = userEvent.setup();
+    renderPage([`/app/jobs/new?job=${jobAddress}`]);
+
+    expect(await screen.findByText(jobAddress)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Finish funding" })).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Finish funding" }));
+
+    await screen.findByText("Escrow funded on GIWA Sepolia.");
+    expect(testState.runCreate).not.toHaveBeenCalled();
+    expect(testState.uploadJobMetadata).not.toHaveBeenCalled();
+    expect(testState.runApprove).toHaveBeenCalledWith(expect.objectContaining({
+      request: expect.objectContaining({ args: [jobAddress, 25_250_000n] }),
+    }));
+  });
+
+  it("resolves a just-created chain job by CID before retrying an interrupted create receipt", async () => {
+    let chainJobExists = false;
+    testState.publicClient.readContract.mockImplementation(({ functionName }: { functionName: string }) => {
+      if (functionName === "getJobsByClient") return Promise.resolve(chainJobExists ? [jobAddress] : []);
+      if (functionName === "client") return Promise.resolve(testState.wallet.address);
+      if (functionName === "metadataCid") return Promise.resolve(metadataCid);
+      if (functionName === "totalAmount") return Promise.resolve(25_250_000n);
+      if (functionName === "status") return Promise.resolve(0);
+      if (functionName === "allowance") return Promise.resolve(0n);
+      return Promise.resolve(0n);
+    });
+    testState.runCreate.mockImplementationOnce(async () => {
+      chainJobExists = true;
+      throw new Error("receipt RPC timed out");
+    });
+    const user = userEvent.setup();
+    renderPage();
+    await fillValidForm(user);
+    await user.click(screen.getByRole("button", { name: "Create and fund escrow" }));
+    await screen.findByText("Escrow funded on GIWA Sepolia.");
+    expect(testState.runCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("invalidates client job data immediately after creation even if funding is rejected", async () => {
+    testState.runFund.mockRejectedValueOnce({ name: "UserRejectedRequestError", code: 4001 });
+    const user = userEvent.setup();
+    const { queryClient } = renderPage();
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
+    await fillValidForm(user);
+    await user.click(screen.getByRole("button", { name: "Create and fund escrow" }));
+
+    await screen.findByText("You cancelled funding in your wallet. Your created job is ready to finish funding.");
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["jobs", 91342], exact: true });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["jobs", 91342, "detail", jobAddress] });
+  });
+
+  it("cancels an unconfirmed workflow when the connected account changes", async () => {
+    let resolveUpload: (value: { cid: string; url: string }) => void;
+    testState.uploadJobMetadata.mockImplementationOnce(() => new Promise((resolve) => { resolveUpload = resolve; }));
+    const user = userEvent.setup();
+    const rendered = renderPage();
+    await fillValidForm(user);
+    await user.click(screen.getByRole("button", { name: "Create and fund escrow" }));
+
+    testState.wallet.address = "0x3333333333333333333333333333333333333333" as Address;
+    rendered.rerender(
+      <QueryClientProvider client={rendered.queryClient}>
+        <MemoryRouter><NewJobPage /></MemoryRouter>
+      </QueryClientProvider>,
+    );
+    resolveUpload!({ cid: metadataCid, url: "https://gateway.test/metadata" });
+
+    await waitFor(() => expect(testState.runCreate).not.toHaveBeenCalled());
   });
 });
