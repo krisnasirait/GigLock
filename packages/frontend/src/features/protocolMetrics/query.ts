@@ -16,6 +16,7 @@ import {
   aggregateProtocolMetrics,
   assertMetricsAddresses,
   blockRanges,
+  chunkItems,
   type JobSnapshot,
   type ProtocolEvent,
   type ProtocolMetrics,
@@ -28,11 +29,7 @@ const METRICS_STALE_TIME = 30_000;
 const METRICS_REFRESH_INTERVAL = 60_000;
 
 function addressBatches(addresses: Address[]): Address[][] {
-  const batches: Address[][] = [];
-  for (let index = 0; index < addresses.length; index += ADDRESS_BATCH_SIZE) {
-    batches.push(addresses.slice(index, index + ADDRESS_BATCH_SIZE));
-  }
-  return batches;
+  return chunkItems(addresses, ADDRESS_BATCH_SIZE);
 }
 
 function requiredLogFields(log: Log): {
@@ -92,29 +89,35 @@ async function loadJobs(
 ): Promise<JobSnapshot[]> {
   if (addresses.length === 0) return [];
 
-  const contracts = addresses.flatMap((address) => [
-    {
-      address,
-      abi: EscrowJobAbi,
-      functionName: "status",
-    } as const,
-    {
-      address: mockUsdc,
-      abi: MockUSDCAbi,
-      functionName: "balanceOf",
-      args: [address],
-    } as const,
-  ]);
-  const results = await publicClient.multicall({
-    contracts,
-    allowFailure: false,
-  });
+  const snapshots = await Promise.all(
+    addressBatches(addresses).map(async (addressBatch) => {
+      const contracts = addressBatch.flatMap((address) => [
+        {
+          address,
+          abi: EscrowJobAbi,
+          functionName: "status",
+        } as const,
+        {
+          address: mockUsdc,
+          abi: MockUSDCAbi,
+          functionName: "balanceOf",
+          args: [address],
+        } as const,
+      ]);
+      const results = await publicClient.multicall({
+        contracts,
+        allowFailure: false,
+      });
 
-  return addresses.map((address, index) => ({
-    address,
-    status: Number(results[index * 2]),
-    balance: results[index * 2 + 1] as bigint,
-  }));
+      return addressBatch.map((address, index) => ({
+        address,
+        status: Number(results[index * 2]),
+        balance: results[index * 2 + 1] as bigint,
+      }));
+    }),
+  );
+
+  return snapshots.flat();
 }
 
 async function loadBlockTimestamps(blockNumbers: bigint[]) {

@@ -3,6 +3,7 @@ import {
   aggregateProtocolMetrics,
   assertMetricsAddresses,
   blockRanges,
+  chunkItems,
   formatDuration,
   formatUsdc,
   toStatCardValues,
@@ -166,6 +167,14 @@ describe("RPC query helpers", () => {
       [100n, 149n],
       [150n, 199n],
       [200n, 205n],
+    ]);
+  });
+
+  it("chunks contract reads into bounded batches", () => {
+    expect(chunkItems([1, 2, 3, 4, 5], 2)).toEqual([
+      [1, 2],
+      [3, 4],
+      [5],
     ]);
   });
 
