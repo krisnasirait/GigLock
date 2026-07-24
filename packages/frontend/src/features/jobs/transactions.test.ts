@@ -203,18 +203,33 @@ describe("job transaction workflows", () => {
     ).resolves.toMatchObject({ hash: "0xabc" });
   });
 
-  it("discovers worker jobs from worker-filtered JobAccepted events before hydration", async () => {
-    chain.getContractEvents.mockResolvedValue([{ address: job }]);
-    chain.multicall.mockResolvedValue([2, factory, account, 5n, "not-a-valid-cid", 0n]);
+  it("hydrates only factory-authorized worker events", async () => {
+    chain.readContract.mockResolvedValue(1n);
+    chain.multicall
+      .mockResolvedValueOnce([job])
+      .mockResolvedValueOnce([2, factory, account, 5n, "not-a-valid-cid", 0n]);
+    chain.getContractEvents.mockResolvedValue([{ address: job }, { address: otherFactory }]);
 
     await expect(loadWorkerJobs(account)).resolves.toMatchObject([
       { address: job, worker: account },
     ]);
     expect(chain.getContractEvents).toHaveBeenCalledWith({
+      address: [job],
       abi: EscrowJobAbi,
       eventName: "JobAccepted",
       args: { worker: account },
       strict: true,
+    });
+    expect(chain.multicall).toHaveBeenLastCalledWith({
+      contracts: [
+        { address: job, abi: EscrowJobAbi, functionName: "status" },
+        { address: job, abi: EscrowJobAbi, functionName: "client" },
+        { address: job, abi: EscrowJobAbi, functionName: "worker" },
+        { address: job, abi: EscrowJobAbi, functionName: "totalAmount" },
+        { address: job, abi: EscrowJobAbi, functionName: "metadataCid" },
+        { address: job, abi: EscrowJobAbi, functionName: "milestoneCount" },
+      ],
+      allowFailure: false,
     });
   });
 });

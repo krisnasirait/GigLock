@@ -5,6 +5,7 @@ import { fetchJobMetadata } from "./ipfs.js";
 import type { JobMetadataV1, MilestoneTuple } from "./model.js";
 
 const jobsKeyPrefix = ["jobs", ACTIVE_CHAIN_ID] as const;
+const JOB_EVENT_ADDRESS_BATCH_SIZE = 100;
 
 export const jobsKeys = {
   all: jobsKeyPrefix,
@@ -34,6 +35,14 @@ function configuredFactory(): Address {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Job metadata is unavailable.";
+}
+
+function addressBatches(addresses: Address[]): Address[][] {
+  const batches: Address[][] = [];
+  for (let index = 0; index < addresses.length; index += JOB_EVENT_ADDRESS_BATCH_SIZE) {
+    batches.push(addresses.slice(index, index + JOB_EVENT_ADDRESS_BATCH_SIZE));
+  }
+  return batches;
 }
 
 async function loadSnapshots(addresses: Address[]): Promise<JobChainSnapshot[]> {
@@ -134,14 +143,29 @@ export async function loadJob(address: Address): Promise<JobChainSnapshot> {
 }
 
 export async function loadWorkerJobs(account: Address): Promise<JobChainSnapshot[]> {
-  const acceptedJobs = await publicClient.getContractEvents({
-    abi: EscrowJobAbi,
-    eventName: "JobAccepted",
-    args: { worker: account },
-    strict: true,
-  });
+  const factoryJobs = await loadFactoryJobAddresses();
+  if (factoryJobs.length === 0) return [];
+
+  const acceptedJobs = (
+    await Promise.all(
+      addressBatches(factoryJobs).map((address) =>
+        publicClient.getContractEvents({
+          address,
+          abi: EscrowJobAbi,
+          eventName: "JobAccepted",
+          args: { worker: account },
+          strict: true,
+        }),
+      ),
+    )
+  ).flat();
+  const factoryJobAddresses = new Set(factoryJobs.map((address) => address.toLowerCase()));
   const addresses = [
-    ...new Map(acceptedJobs.map((event) => [event.address.toLowerCase(), event.address])).values(),
+    ...new Map(
+      acceptedJobs
+        .filter((event) => factoryJobAddresses.has(event.address.toLowerCase()))
+        .map((event) => [event.address.toLowerCase(), event.address]),
+    ).values(),
   ];
   return loadSnapshots(addresses);
 }
