@@ -136,7 +136,7 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
   return (
     <svg width={w} height={h} className="overflow-visible">
       <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={(w / (data.length - 1)) * (data.length - 1)} cy={h - ((data[data.length - 1] - min) / (max - min)) * h} r="2.5" fill={color} />
+      <circle cx={(w / (data.length - 1)) * (data.length - 1)} cy={h - (((data[data.length - 1] ?? 0) - min) / (max - min)) * h} r="2.5" fill={color} />
     </svg>
   );
 }

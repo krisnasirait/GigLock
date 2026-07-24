@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
-  "buildCommand": "pnpm --filter @giglock/shared build && pnpm --filter @giglock/frontend build",
+  "buildCommand": "pnpm --filter @giglock/contracts compile && pnpm --filter @giglock/shared build && pnpm --filter @giglock/frontend build",
   "outputDirectory": "dist",
   "installCommand": "pnpm install --frozen-lockfile",
   "rewrites": [

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 
 const FLOW_STATES = [
   { label: 'FUNDED', color: '#3b82f6', pct: 0 },
@@ -22,7 +22,8 @@ export function EscrowFlowCard() {
     return () => clearInterval(interval);
   }, []);
 
-  const state = FLOW_STATES[activeState];
+  // activeState is always 0–3 (modulo FLOW_STATES.length), but TS can't prove it
+  const state = FLOW_STATES[activeState] ?? FLOW_STATES[0]!;
 
   return (
     <div className="relative rounded-2xl overflow-hidden border border-[#3b82f6]/20 bg-[#070c1e]"
