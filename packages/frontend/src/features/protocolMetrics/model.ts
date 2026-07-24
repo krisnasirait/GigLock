@@ -1,5 +1,5 @@
 import type { Address, Hash } from "viem";
-import { formatUnits } from "viem";
+import { formatUnits, isAddressEqual, zeroAddress } from "viem";
 
 const DAY_SECONDS = 86_400;
 const CURRENT_PERIOD_DAYS = 7;
@@ -36,6 +36,34 @@ export type ProtocolMetrics = {
   transactionSparkline: number[];
   transactionChangePercent: number | null;
 };
+
+export function blockRanges(
+  fromBlock: bigint,
+  toBlock: bigint,
+  chunkSize: bigint,
+): Array<[bigint, bigint]> {
+  if (chunkSize <= 0n) throw new Error("Block chunk size must be positive");
+  if (toBlock < fromBlock) return [];
+
+  const ranges: Array<[bigint, bigint]> = [];
+  for (let start = fromBlock; start <= toBlock; start += chunkSize) {
+    const end = start + chunkSize - 1n;
+    ranges.push([start, end < toBlock ? end : toBlock]);
+  }
+  return ranges;
+}
+
+export function assertMetricsAddresses(addresses: {
+  jobFactory: Address;
+  mockUsdc: Address;
+}): void {
+  if (
+    isAddressEqual(addresses.jobFactory, zeroAddress) ||
+    isAddressEqual(addresses.mockUsdc, zeroAddress)
+  ) {
+    throw new Error("Protocol metrics are not configured for this chain");
+  }
+}
 
 function uniqueTransactionCount(events: ProtocolEvent[]): number {
   return new Set(events.map((event) => event.transactionHash)).size;

@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   aggregateProtocolMetrics,
+  assertMetricsAddresses,
+  blockRanges,
   formatDuration,
   formatUsdc,
   type ProtocolMetricsInput,
 } from "./model.js";
+import { zeroAddress } from "viem";
 
 const now = 1_753_334_400;
 const jobOne = "0x0000000000000000000000000000000000000001";
@@ -140,5 +143,24 @@ describe("metric formatters", () => {
     expect(formatUsdc(0n)).toBe("$0.00");
     expect(formatDuration(null)).toBe("—");
     expect(formatDuration(1.02)).toBe("1.02");
+  });
+});
+
+describe("RPC query helpers", () => {
+  it("splits inclusive block ranges without gaps or overlap", () => {
+    expect(blockRanges(100n, 205n, 50n)).toEqual([
+      [100n, 149n],
+      [150n, 199n],
+      [200n, 205n],
+    ]);
+  });
+
+  it("rejects a zero-address protocol configuration", () => {
+    expect(() =>
+      assertMetricsAddresses({
+        jobFactory: zeroAddress,
+        mockUsdc: zeroAddress,
+      }),
+    ).toThrow("Protocol metrics are not configured");
   });
 });
