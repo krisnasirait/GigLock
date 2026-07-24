@@ -261,6 +261,64 @@ describe("NewJobPage", () => {
     expect(testState.runCreate).toHaveBeenCalledTimes(1);
   });
 
+  it("resumes a reloaded pending create by its original CID before validating or uploading a replacement", async () => {
+    testState.publicClient.waitForTransactionReceipt.mockImplementationOnce(async () => {
+      testState.chainJobExists = true;
+      throw new Error("receipt RPC timed out");
+    });
+    const user = userEvent.setup();
+    renderPage([`/app/jobs/new?cid=${metadataCid}&createTx=0xpending`]);
+
+    await user.click(screen.getByRole("button", { name: "Check submitted creation" }));
+    await screen.findByText("Escrow funded on GIWA Sepolia.");
+
+    expect(testState.publicClient.waitForTransactionReceipt).toHaveBeenCalledWith({ hash: "0xpending" });
+    expect(testState.uploadJobMetadata).not.toHaveBeenCalled();
+    expect(testState.runCreate).not.toHaveBeenCalled();
+    expect(testState.runApprove).toHaveBeenCalledWith(expect.objectContaining({
+      request: expect.objectContaining({ args: [jobAddress, 25_250_000n] }),
+    }));
+  });
+
+  it("keeps an interrupted pending creation locked instead of allowing the original CID to be replaced", async () => {
+    testState.publicClient.waitForTransactionReceipt.mockRejectedValueOnce(new Error("receipt RPC timed out"));
+    const user = userEvent.setup();
+    renderPage([`/app/jobs/new?cid=${metadataCid}&createTx=0xpending`]);
+
+    await user.click(screen.getByRole("button", { name: "Check submitted creation" }));
+    expect(await screen.findByText("Creation is still pending or its receipt is unavailable. Check the submitted transaction before trying again.")).toBeTruthy();
+
+    expect((screen.getByLabelText("Job title") as HTMLInputElement).disabled).toBe(true);
+    expect(screen.getByRole("group", { name: "Milestone 1" }).hasAttribute("disabled")).toBe(true);
+    expect(testState.uploadJobMetadata).not.toHaveBeenCalled();
+    expect(testState.runCreate).not.toHaveBeenCalled();
+  });
+
+  it("shows the verified escrow total and read-only metadata state when its IPFS metadata is unavailable", async () => {
+    testState.chainJobExists = true;
+    testState.fetchJobMetadata.mockRejectedValueOnce(new Error("gateway unavailable"));
+    const user = userEvent.setup();
+    renderPage([`/app/jobs/new?job=${jobAddress}`]);
+
+    expect(await screen.findByText("Metadata is unavailable from IPFS. The verified on-chain escrow amount is shown below; this job is read-only.")).toBeTruthy();
+    expect(screen.getByText("Total escrow: 25.25 USDC")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Finish funding" }));
+
+    await screen.findByText("Escrow funded on GIWA Sepolia.");
+    expect(testState.runApprove).toHaveBeenCalledWith(expect.objectContaining({
+      request: expect.objectContaining({ args: [jobAddress, 25_250_000n] }),
+    }));
+  });
+
+  it("does not replace a new job draft with an unrelated created escrow without a recovery hint", async () => {
+    testState.chainJobExists = true;
+    renderPage();
+
+    await waitFor(() => expect(testState.publicClient.readContract).not.toHaveBeenCalled());
+    expect((screen.getByLabelText("Job title") as HTMLInputElement).disabled).toBe(false);
+    expect(screen.getByRole("button", { name: "Create and fund escrow" })).toBeTruthy();
+  });
+
   it("invalidates client job data immediately after creation even if funding is rejected", async () => {
     testState.runFund.mockRejectedValueOnce({ name: "UserRejectedRequestError", code: 4001 });
     const user = userEvent.setup();

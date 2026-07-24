@@ -34,6 +34,11 @@ type ConfirmedJob = {
   totalAmount: bigint;
 };
 
+type PendingCreation = {
+  hash: Hash;
+  cid?: string;
+};
+
 const initialMilestone = (): MilestoneDraft => ({
   id: crypto.randomUUID(),
   title: "",
@@ -156,7 +161,11 @@ export function NewJobPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [metadataCid, setMetadataCid] = useState<string | undefined>(hints.metadataCid ?? initialState?.metadataCid);
   const [confirmedJob, setConfirmedJob] = useState<ConfirmedJob | undefined>();
-  const [pendingCreateHash, setPendingCreateHash] = useState<Hash | undefined>(hints.createHash);
+  const [pendingCreation, setPendingCreation] = useState<PendingCreation | undefined>(() => hints.createHash ? {
+    hash: hints.createHash,
+    cid: hints.metadataCid ?? initialState?.metadataCid,
+  } : undefined);
+  const [metadataUnavailable, setMetadataUnavailable] = useState(false);
   const [stage, setStage] = useState<CreateStage>("idle");
   const [workflowError, setWorkflowError] = useState<string | undefined>();
   const [hashes, setHashes] = useState<Partial<Record<"create" | "approve" | "fund", Hash>>>({});
@@ -204,13 +213,14 @@ export function NewJobPage() {
     if (workflowGeneration.current !== generation || accountRef.current !== account) return false;
     setConfirmedJob(job);
     setMetadataCid(job.metadataCid);
-    setPendingCreateHash(undefined);
+    setPendingCreation(undefined);
+    setMetadataUnavailable(false);
     persistRecovery({ cid: job.metadataCid, job: job.address });
     try {
       const metadata = await fetchJobMetadata(job.metadataCid);
       if (workflowGeneration.current === generation && accountRef.current === account) setDraft(draftFromMetadata(metadata));
     } catch {
-      // Funding uses the verified chain total; metadata improves the read-only resume view only.
+      if (workflowGeneration.current === generation && accountRef.current === account) setMetadataUnavailable(true);
     }
     return workflowGeneration.current === generation && accountRef.current === account;
   }
@@ -221,7 +231,8 @@ export function NewJobPage() {
     workflowGeneration.current += 1;
     setConfirmedJob(undefined);
     setMetadataCid(undefined);
-    setPendingCreateHash(undefined);
+    setPendingCreation(undefined);
+    setMetadataUnavailable(false);
     setHashes({});
     setErrors({});
     setWorkflowError(undefined);
@@ -239,16 +250,13 @@ export function NewJobPage() {
     async function recoverFromChain() {
       try {
         const hintedJob = hints.jobAddress ?? initialState?.jobAddress;
-        const hintedCid = hints.metadataCid ?? initialState?.metadataCid;
+        const hintedCid = pendingCreation?.cid ?? hints.metadataCid ?? initialState?.metadataCid;
+        if (!hintedJob && !hintedCid) return;
         const recovered = hintedJob
           ? await findVerifiedJob(account, { address: hintedJob, cid: hintedCid })
           : hintedCid
             ? await findVerifiedJob(account, { cid: hintedCid })
-            : await (async () => {
-              const jobs = await publicClient.readContract({ address: giwaAddresses.jobFactory, abi: JobFactoryAbi, functionName: "getJobsByClient", args: [account] });
-              const created = (await Promise.all(jobs.map((job) => findVerifiedJob(account, { address: job })))).filter((job): job is ConfirmedJob => job !== undefined);
-              return created.length === 1 ? created[0] : undefined;
-            })();
+            : undefined;
         if (!cancelled && recovered) await adoptConfirmedJob(recovered, account, generation);
       } catch {
         // The route remains usable for a new job while the RPC is unavailable.
@@ -256,7 +264,7 @@ export function NewJobPage() {
     }
     void recoverFromChain();
     return () => { cancelled = true; };
-  }, [address, confirmedJob, hints.jobAddress, hints.metadataCid, initialState?.jobAddress, initialState?.metadataCid]);
+  }, [address, confirmedJob, hints.jobAddress, hints.metadataCid, initialState?.jobAddress, initialState?.metadataCid, pendingCreation?.cid]);
 
   function updateDraft(field: Exclude<keyof FormDraft, "milestones">, value: string) {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -273,6 +281,56 @@ export function NewJobPage() {
     const stillCurrent = () => workflowGeneration.current === generation && accountRef.current === account;
     setWorkflowError(undefined);
     let fundingJob = confirmedJob;
+    if (!fundingJob && pendingCreation) {
+      const pending = pendingCreation;
+      if (!pending.cid) {
+        setStage("error");
+        setWorkflowError("The submitted creation transaction is missing its metadata identity. Keep this route open and check the transaction before posting another job.");
+        setIsSubmitting(false);
+        return;
+      }
+      setIsSubmitting(true);
+      try {
+        setStage("create");
+        setProgressDetail("Checking the submitted creation transaction on GIWA Sepolia…");
+        const receipt = await publicClient.waitForTransactionReceipt({ hash: pending.hash });
+        if (!stillCurrent()) return;
+        if (receipt.status === "success") {
+          const createdAddress = decodeCreatedJobAddress(receipt, giwaAddresses.jobFactory);
+          const found = await findVerifiedJob(account, { address: createdAddress, cid: pending.cid });
+          if (!found) {
+            setStage("error");
+            setWorkflowError("The submitted creation receipt has not produced a verified escrow yet. Keep checking this transaction before posting another job.");
+            setIsSubmitting(false);
+            return;
+          }
+          fundingJob = found;
+          await adoptConfirmedJob(found, account, generation);
+        } else {
+          const found = await findVerifiedJob(account, { cid: pending.cid });
+          if (found) {
+            fundingJob = found;
+            await adoptConfirmedJob(found, account, generation);
+          } else {
+            setPendingCreation(undefined);
+            setMetadataCid(pending.cid);
+            persistRecovery({ cid: pending.cid });
+          }
+        }
+      } catch {
+        if (!stillCurrent()) return;
+        const found = await findVerifiedJob(account, { cid: pending.cid }).catch(() => undefined);
+        if (found) {
+          fundingJob = found;
+          await adoptConfirmedJob(found, account, generation);
+        } else {
+          setStage("error");
+          setWorkflowError("Creation is still pending or its receipt is unavailable. Check the submitted transaction before trying again.");
+          setIsSubmitting(false);
+          return;
+        }
+      }
+    }
     let validation: ReturnType<typeof validateDraft> | undefined;
     if (!fundingJob) {
       validation = validateDraft(draft, createdAtRef.current);
@@ -299,7 +357,7 @@ export function NewJobPage() {
           }
           if (!stillCurrent()) return;
           setMetadataCid(cid);
-          persistRecovery({ cid, createTx: pendingCreateHash });
+          persistRecovery({ cid });
         }
       } catch (error) {
         if (!stillCurrent()) return;
@@ -322,34 +380,6 @@ export function NewJobPage() {
       }
     }
 
-    if (!fundingJob && pendingCreateHash) {
-      try {
-        setStage("create");
-        setProgressDetail("Checking the submitted creation transaction on GIWA Sepolia…");
-        const receipt = await publicClient.waitForTransactionReceipt({ hash: pendingCreateHash });
-        if (receipt.status === "success") {
-          const createdAddress = decodeCreatedJobAddress(receipt, giwaAddresses.jobFactory);
-          fundingJob = await findVerifiedJob(account, { address: createdAddress, cid });
-          if (fundingJob && stillCurrent()) await adoptConfirmedJob(fundingJob, account, generation);
-        } else if (stillCurrent()) {
-          setPendingCreateHash(undefined);
-          persistRecovery({ cid });
-        }
-      } catch {
-        if (!stillCurrent()) return;
-        const found = await findVerifiedJob(account, { cid }).catch(() => undefined);
-        if (found) {
-          fundingJob = found;
-          await adoptConfirmedJob(found, account, generation);
-        } else {
-          setStage("error");
-          setWorkflowError("Creation is still pending or its receipt is unavailable. Check the submitted transaction before trying again.");
-          setIsSubmitting(false);
-          return;
-        }
-      }
-    }
-
     if (!fundingJob) {
       try {
         setStage("create");
@@ -359,7 +389,7 @@ export function NewJobPage() {
             const hash = await writeContractAsync(request as never);
             if (!stillCurrent()) throw new Error("Wallet account changed before creation was submitted.");
             setHashes((current) => ({ ...current, create: hash }));
-            setPendingCreateHash(hash);
+            setPendingCreation({ hash, cid });
             persistRecovery({ cid, createTx: hash });
             setProgressDetail("Escrow creation submitted. Waiting for the GIWA receipt…");
             return hash;
@@ -475,8 +505,10 @@ export function NewJobPage() {
     }
   }
 
-  const retryingMetadata = stage === "error" && !confirmedJob && workflowError?.startsWith("Metadata upload failed") === true;
-  const actionLabel = retryingMetadata ? "Retry metadata upload" : confirmedJob && stage !== "complete" ? "Finish funding" : "Create and fund escrow";
+  const draftLocked = Boolean(confirmedJob || pendingCreation);
+  const displayedTotal = confirmedJob?.totalAmount ?? liveTotal;
+  const retryingMetadata = stage === "error" && !confirmedJob && !pendingCreation && workflowError?.startsWith("Metadata upload failed") === true;
+  const actionLabel = pendingCreation ? "Check submitted creation" : retryingMetadata ? "Retry metadata upload" : confirmedJob && stage !== "complete" ? "Finish funding" : "Create and fund escrow";
 
   return (
     <div className="dashboard-page new-job-page">
@@ -498,13 +530,13 @@ export function NewJobPage() {
             <p className="new-job-limit">All fields are stored in IPFS metadata.</p>
           </div>
           <label htmlFor="job-title">Job title</label>
-          <input className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-cyan-300" id="job-title" value={draft.title} maxLength={100} disabled={Boolean(confirmedJob)} aria-invalid={errors.title ? true : undefined} aria-describedby={errors.title ? "job-title-error" : undefined} onChange={(event) => updateDraft("title", event.target.value)} />
+          <input className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-cyan-300" id="job-title" value={draft.title} maxLength={100} disabled={draftLocked} aria-invalid={errors.title ? true : undefined} aria-describedby={errors.title ? "job-title-error" : undefined} onChange={(event) => updateDraft("title", event.target.value)} />
           {errors.title ? <p id="job-title-error" className="new-job-error">{errors.title}</p> : null}
           <label htmlFor="job-description">Job description</label>
-          <textarea className="mt-1 min-h-32 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-cyan-300" id="job-description" value={draft.description} maxLength={4000} disabled={Boolean(confirmedJob)} aria-invalid={errors.description ? true : undefined} aria-describedby={errors.description ? "job-description-error" : undefined} onChange={(event) => updateDraft("description", event.target.value)} />
+          <textarea className="mt-1 min-h-32 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-cyan-300" id="job-description" value={draft.description} maxLength={4000} disabled={draftLocked} aria-invalid={errors.description ? true : undefined} aria-describedby={errors.description ? "job-description-error" : undefined} onChange={(event) => updateDraft("description", event.target.value)} />
           {errors.description ? <p id="job-description-error" className="new-job-error">{errors.description}</p> : null}
           <label htmlFor="job-skills">Skills</label>
-          <input className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-cyan-300" id="job-skills" value={draft.skills} disabled={Boolean(confirmedJob)} aria-invalid={errors.skills ? true : undefined} aria-describedby={errors.skills ? "job-skills-error job-skills-help" : "job-skills-help"} onChange={(event) => updateDraft("skills", event.target.value)} />
+          <input className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-cyan-300" id="job-skills" value={draft.skills} disabled={draftLocked} aria-invalid={errors.skills ? true : undefined} aria-describedby={errors.skills ? "job-skills-error job-skills-help" : "job-skills-help"} onChange={(event) => updateDraft("skills", event.target.value)} />
           <p id="job-skills-help" className="new-job-helper">Separate up to 10 skills with commas. Each skill can be 1–32 characters.</p>
           {errors.skills ? <p id="job-skills-error" className="new-job-error">{errors.skills}</p> : null}
         </section>
@@ -515,12 +547,13 @@ export function NewJobPage() {
           onChange={updateMilestone}
           onAdd={() => setDraft((current) => current.milestones.length >= 10 ? current : { ...current, milestones: [...current.milestones, initialMilestone()] })}
           onRemove={(id) => setDraft((current) => current.milestones.length <= 1 ? current : { ...current, milestones: current.milestones.filter((milestone) => milestone.id !== id) })}
-          disabled={Boolean(confirmedJob)}
+          disabled={draftLocked}
         />
 
         <section className="new-job-submit card-glass rounded-xl p-5 sm:p-6" aria-label="Escrow funding">
           <p className="dashboard-overline">Escrow amount</p>
-          <p className="new-job-total">Total escrow: {formatUnits(liveTotal, 6)} USDC</p>
+          <p className="new-job-total">Total escrow: {formatUnits(displayedTotal, 6)} USDC</p>
+          {metadataUnavailable ? <p className="new-job-helper" role="status">Metadata is unavailable from IPFS. The verified on-chain escrow amount is shown below; this job is read-only.</p> : null}
           {errors.total || errors.form ? <p className="new-job-error" role="alert">{errors.total ?? errors.form}</p> : null}
           <p className="new-job-helper">MockUSDC is approved for this exact total, then transferred only after the approval receipt confirms.</p>
           {confirmedJob ? <p className="new-job-address">Escrow address: <code>{confirmedJob.address}</code></p> : null}
