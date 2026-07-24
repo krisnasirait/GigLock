@@ -4,6 +4,7 @@ import { Footer } from './components/Footer';
 import { BlockchainFooter } from './components/BlockchainFooter';
 import { HomePage } from './pages/HomePage';
 import { AppDashboardPage } from './pages/AppDashboardPage';
+import { NewJobPage } from './pages/NewJobPage';
 import { PlaceholderPage } from './components/PlaceholderPage';
 
 export function App() {
@@ -74,6 +75,7 @@ export function App() {
               path="/app"
               element={<AppDashboardPage />}
             />
+            <Route path="/app/jobs/new" element={<NewJobPage />} />
             <Route
               path="*"
               element={
