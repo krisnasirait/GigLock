@@ -1,48 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { EscrowFlowCard } from '../components/EscrowFlowCard';
+import { toStatCardValues } from '../features/protocolMetrics/model';
+import { useProtocolMetrics } from '../features/protocolMetrics/query';
 
 const TRUST_BADGES = [
   { icon: '🛡️', label: 'Non-Custodial', sub: 'Escrow' },
   { icon: '⛓️', label: 'On-Chain', sub: 'Reputation' },
   { icon: '🪪', label: 'GIWA ID', sub: 'Soulbound' },
   { icon: '✅', label: 'Audited', sub: 'Smart Contracts' },
-];
-
-const STATS = [
-  {
-    label: 'TOTAL VALUE LOCKED',
-    value: '$12,482,920',
-    unit: 'USDC',
-    change: '+24.5%',
-    sub: 'Locked across 8,492 jobs',
-    sparkline: [20, 35, 30, 50, 45, 70, 65, 90, 85, 100],
-    color: '#10b981',
-  },
-  {
-    label: 'TOTAL TRANSACTIONS',
-    value: '1,248,392',
-    change: '+18.7%',
-    sub: 'On-chain transactions',
-    sparkline: [15, 25, 20, 40, 38, 55, 60, 75, 80, 95],
-    color: '#3b82f6',
-  },
-  {
-    label: 'ACTIVE ESCROW JOBS',
-    value: '3,249',
-    change: '+16.2%',
-    sub: 'In progress',
-    donut: true,
-    color: '#8b5cf6',
-  },
-  {
-    label: 'AVG. PAYMENT TIME',
-    value: '1.02',
-    unit: 'seconds',
-    sub: 'Powered by GIWA Chain',
-    icon: true,
-    color: '#22d3ee',
-  },
 ];
 
 const FEATURES = [
@@ -129,14 +95,15 @@ const ECOSYSTEMS = [
 function Sparkline({ data, color }: { data: number[]; color: string }) {
   const max = Math.max(...data);
   const min = Math.min(...data);
+  const range = max - min || 1;
   const w = 80, h = 24;
   const points = data
-    .map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - min) / (max - min)) * h}`)
+    .map((v, i) => `${(i / (data.length - 1)) * w},${h - ((v - min) / range) * h}`)
     .join(' ');
   return (
     <svg width={w} height={h} className="overflow-visible">
       <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={(w / (data.length - 1)) * (data.length - 1)} cy={h - (((data[data.length - 1] ?? 0) - min) / (max - min)) * h} r="2.5" fill={color} />
+      <circle cx={w} cy={h - (((data[data.length - 1] ?? 0) - min) / range) * h} r="2.5" fill={color} />
     </svg>
   );
 }
@@ -167,6 +134,50 @@ function DonutChart({ pct, color }: { pct: number; color: string }) {
 export function HomePage() {
   const heroRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const metricsQuery = useProtocolMetrics();
+  const isInitialLoading = metricsQuery.isPending && metricsQuery.data === undefined;
+  const isUnavailable = metricsQuery.isError && metricsQuery.data === undefined;
+  const cardValues = metricsQuery.data ? toStatCardValues(metricsQuery.data) : null;
+  const displayValue = (value: string | undefined) => {
+    if (isInitialLoading) return '…';
+    if (isUnavailable) return 'Unavailable';
+    return value ?? '—';
+  };
+  const transactionChange = metricsQuery.data?.transactionChangePercent;
+  const stats = [
+    {
+      label: 'TOTAL VALUE LOCKED',
+      value: displayValue(cardValues?.tvl),
+      unit: cardValues ? 'USDC' : undefined,
+      sub: cardValues?.lockedJobs ?? 'Live GigLock escrow balances',
+      color: '#10b981',
+    },
+    {
+      label: 'TOTAL TRANSACTIONS',
+      value: displayValue(cardValues?.transactions),
+      change: transactionChange === null || transactionChange === undefined
+        ? undefined
+        : `${transactionChange >= 0 ? '+' : ''}${transactionChange.toFixed(1)}%`,
+      sub: 'GigLock protocol transactions',
+      sparkline: metricsQuery.data?.transactionSparkline,
+      color: '#3b82f6',
+    },
+    {
+      label: 'ACTIVE ESCROW JOBS',
+      value: displayValue(cardValues?.activeJobs),
+      sub: 'Funded or in progress',
+      donut: cardValues?.activePercent,
+      color: '#8b5cf6',
+    },
+    {
+      label: 'AVG. PAYMENT TIME',
+      value: displayValue(cardValues?.averagePaymentTime),
+      unit: metricsQuery.data?.averagePaymentSeconds === null ? undefined : 'seconds',
+      sub: 'Powered by GIWA Chain',
+      icon: true,
+      color: '#22d3ee',
+    },
+  ];
 
   useEffect(() => {
     const onMouse = (e: MouseEvent) => {
@@ -272,25 +283,36 @@ export function HomePage() {
       {/* ===== STATS BAR ===== */}
       <section className="border-y border-white/5 bg-[#070c1e]/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-6 py-8 grid grid-cols-2 md:grid-cols-4 gap-6">
-          {STATS.map((stat) => (
+          {stats.map((stat) => (
             <div key={stat.label} className="stat-card">
               <div className="text-[10px] font-semibold text-white/40 uppercase tracking-wider mb-2">
                 {stat.label}
               </div>
               <div className="flex items-end gap-2 mb-1">
-                <span className="text-2xl font-black text-white">{stat.value}</span>
+                <span className={`text-2xl font-black text-white ${isInitialLoading ? 'animate-pulse' : ''}`}>
+                  {stat.value}
+                </span>
                 {stat.unit && <span className="text-xs text-white/40 mb-0.5">{stat.unit}</span>}
               </div>
               {stat.change && (
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold" style={{ color: stat.color }}>
-                    ↑ {stat.change}
+                    {typeof transactionChange === 'number' && transactionChange < 0 ? '↓' : '↑'} {stat.change}
                   </span>
                   {stat.sparkline && <Sparkline data={stat.sparkline} color={stat.color} />}
-                  {stat.donut && <DonutChart pct={62} color={stat.color} />}
                 </div>
               )}
-              {stat.sub && <p className="text-[10px] text-white/30 mt-1">{stat.sub}</p>}
+              {stat.donut !== undefined && <DonutChart pct={stat.donut} color={stat.color} />}
+              {stat.sub && !stat.icon && <p className="text-[10px] text-white/30 mt-1">{stat.sub}</p>}
+              {isUnavailable && (
+                <button
+                  type="button"
+                  className="text-[10px] text-[#3b82f6] hover:text-[#60a5fa] mt-1"
+                  onClick={() => void metricsQuery.refetch()}
+                >
+                  Retry live data
+                </button>
+              )}
               {stat.icon && (
                 <div className="flex items-center gap-2 mt-1">
                   <svg className="w-8 h-8 text-[#22d3ee] opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">

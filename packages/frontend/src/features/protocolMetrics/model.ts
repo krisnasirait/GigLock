@@ -155,3 +155,14 @@ export function formatDuration(seconds: number | null): string {
   if (seconds === null) return "—";
   return seconds.toFixed(2);
 }
+
+export function toStatCardValues(metrics: ProtocolMetrics) {
+  return {
+    tvl: formatUsdc(metrics.tvl),
+    lockedJobs: `Locked across ${metrics.lockedJobs.toLocaleString("en-US")} jobs`,
+    transactions: metrics.totalTransactions.toLocaleString("en-US"),
+    activeJobs: metrics.activeJobs.toLocaleString("en-US"),
+    activePercent: metrics.activePercent,
+    averagePaymentTime: formatDuration(metrics.averagePaymentSeconds),
+  };
+}

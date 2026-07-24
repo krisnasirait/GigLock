@@ -5,6 +5,7 @@ import {
   blockRanges,
   formatDuration,
   formatUsdc,
+  toStatCardValues,
   type ProtocolMetricsInput,
 } from "./model.js";
 import { zeroAddress } from "viem";
@@ -143,6 +144,19 @@ describe("metric formatters", () => {
     expect(formatUsdc(0n)).toBe("$0.00");
     expect(formatDuration(null)).toBe("—");
     expect(formatDuration(1.02)).toBe("1.02");
+  });
+
+  it("maps the empty protocol result to honest card values", () => {
+    const emptyMetrics = aggregateProtocolMetrics({ now, jobs: [], events: [] });
+
+    expect(toStatCardValues(emptyMetrics)).toEqual({
+      tvl: "$0.00",
+      lockedJobs: "Locked across 0 jobs",
+      transactions: "0",
+      activeJobs: "0",
+      activePercent: 0,
+      averagePaymentTime: "—",
+    });
   });
 });
 
