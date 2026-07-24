@@ -95,9 +95,28 @@ Data flow:
 
 ## 4. Local development (5 minutes)
 
+### One-command local dev (recommended)
+
 ```bash
-# Clone
-git clone https://github.com/krisnasirait/GigLock.git
+git clone https://github.com/krisnasrait/GigLock.git
+cd GigLock
+./runner-local.sh
+```
+
+`runner-local.sh` brings up the **entire** local stack — Hardhat node + contracts + relayer + frontend — and prints a MetaMask setup cheat sheet with the four funded seed-account private keys. It's the same flow that CI will exercise.
+
+```bash
+./runner-stop.sh    # kill switch from another terminal (or use Ctrl+C in the runner)
+```
+
+Background processes log to `.run/{hardhat,relayer,frontend}.log` — useful when something fails.
+
+### Manual local dev (4 terminals)
+
+If you want finer control over each layer:
+
+```bash
+git clone https://github.com/krisnasrait/GigLock.git
 cd GigLock
 
 # Install (uses pnpm workspaces — installs all 4 packages)
