@@ -1,21 +1,37 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
+import multipart from "@fastify/multipart";
 import { loadBootConfig, type BootConfig } from "./config.js";
 import { registerHealthRoutes } from "./routes/health.js";
+import { registerIpfsRoutes } from "./routes/ipfs.js";
 
 export async function buildApp(overrides: Partial<BootConfig> = {}): Promise<FastifyInstance> {
   const cfg = loadBootConfig(overrides);
   const app = Fastify({
     logger: { level: cfg.LOG_LEVEL },
+    // 25 MiB cap on the raw multipart payload (Filebase max is 10 MiB by config).
+    bodyLimit: 26 * 1024 * 1024,
   });
 
   await app.register(cors, {
     origin: cfg.ALLOWED_ORIGINS.split(",")
       .map((s) => s.trim())
       .filter(Boolean),
+    // /ipfs/pin needs credentials / multipart headers exposed to the browser
+    // when the frontend is hosted on a different origin.
+    allowedHeaders: ["content-type", "authorization"],
+  });
+
+  // Multipart support for /ipfs/pin.
+  await app.register(multipart, {
+    limits: {
+      fileSize: 25 * 1024 * 1024, // 25 MiB; the route enforces a stricter 10 MiB.
+      files: 1,
+    },
   });
 
   await registerHealthRoutes(app);
+  await registerIpfsRoutes(app);
   // Future: registerMetaTxRoutes(app), registerNonceRoutes(app)
 
   return app;

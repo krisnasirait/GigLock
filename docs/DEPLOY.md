@@ -288,6 +288,13 @@ In **Service → Environment**, set:
 | `MINIMAL_FORWARDER_ADDRESS` | `0x...` | TBD — see §10.5 |
 | `ALLOWED_ORIGINS` | `https://giglock-frontend-<user>.vercel.app` | CORS allowlist; update after the frontend URL is known |
 | `RATE_LIMIT_PER_MIN` | `60` | Per-IP rate cap on `/meta-tx` |
+| `FILEBASE_ACCESS_KEY_ID` | `<Filebase key>` | **Secret.** See §10.3 for setup. |
+| `FILEBASE_SECRET_ACCESS_KEY` | `<Filebase secret>` | **Secret.** |
+| `FILEBASE_BUCKET` | `<bucket name>` | IPFS-pinning-enabled bucket. |
+| `FILEBASE_ENDPOINT` | `https://s3.filebase.io` | Default — only change if self-hosting. |
+| `FILEBASE_REGION` | `us-east-1` | Default. |
+| `IPFS_GATEWAY` | `https://ipfs.filebase.io/ipfs/` | Default. |
+| `IPFS_MAX_FILE_BYTES` | `10485760` | Default 10 MiB. |
 
 ### 7.4 Verify deployment
 
@@ -411,13 +418,46 @@ When you're ready, scaffold `packages/subgraph/` and follow [The Graph's docs](h
 
 ### 10.3 IPFS (proof-of-completion evidence)
 
-The current scaffold hashes proof files but doesn't yet store the files anywhere. For MVP, the proof can just be a string (e.g. "delivered-on-time"). When you want real files:
+The current scaffold uploads proof files via the relayer's `/ipfs/pin` endpoint, which uses **Filebase** (S3-compatible IPFS pinning service).
 
-- **Simplest:** Pin via [web3.storage](https://web3.storage) — they give a free 5GB tier.
-- **Better:** Pin via [Pinata](https://pinata.cloud) — paid, faster.
-- **Privacy-preserving:** Encrypt before hashing, only the hash goes on-chain.
+#### Set up Filebase (one-time)
 
-Add to `packages/shared/src/constants.ts`:
+1. Create a Filebase account at <https://console.filebase.io>.
+2. Create a **bucket** (Settings → Buckets → Create). Enable IPFS pinning on the bucket (Settings → Pinning → IPFS).
+3. Create an **API key** (Settings → Access Keys → Create). You'll get:
+   - **Access Key ID** — `FILEBASE_ACCESS_KEY_ID`
+   - **Secret Access Key** — `FILEBASE_SECRET_ACCESS_KEY`
+4. Note your bucket name — `FILEBASE_BUCKET`.
+
+#### Configure the relayer
+
+Add to `packages/relayer/.env` (or Render Dashboard → Environment):
+
+```dotenv
+FILEBASE_ACCESS_KEY_ID=A...
+FILEBASE_SECRET_ACCESS_KEY=t...
+FILEBASE_BUCKET=your-bucket-name
+FILEBASE_ENDPOINT=https://s3.filebase.io   # default; override only for self-hosted
+FILEBASE_REGION=us-east-1                  # default
+IPFS_GATEWAY=https://ipfs.filebase.io/ipfs/ # default
+IPFS_MAX_FILE_BYTES=10485760               # 10 MiB; default
+```
+
+**Security:** Treat these values as secrets. Never commit them. Use Render's **Secret** env type (or Vercel encrypted env vars for the frontend if you proxy differently).
+
+#### Wire the frontend
+
+The frontend helper `lib/ipfs.ts` already does the right thing — `uploadProof(file)` POSTs the file to `${VITE_RELAYER_URL}/ipfs/pin` and returns `{ cid, url, size, contentType, key }`. Use `hashProofKeccak(file)` to compute the on-chain `proofHash` (bytes32) for `submitMilestone`. The frontend never sees Filebase credentials.
+
+#### Cost
+
+Filebase's free tier gives 5 GB of pinning. For a hackathon demo that's plenty; production traffic may need a paid plan.
+
+#### Alternative providers
+
+The relayer's `services/filebase.ts` is small (~80 lines) and the route is one POST. To swap providers, replace `pinBuffer()` with a Pinata or web3.storage equivalent — the route interface (`{ cid, url, size, contentType, key }`) stays the same.
+
+Add to `packages/shared/src/constants.ts` (already done):
 ```ts
 export const IPFS_GATEWAY = process.env.VITE_IPFS_GATEWAY ?? "https://w3s.link/ipfs/";
 ```
