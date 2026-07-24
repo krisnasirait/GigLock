@@ -1,0 +1,31 @@
+# .dockerignore at repo root — applied when Docker builds use the repo root as context
+# (e.g. packages/relayer/Dockerfile via Render).
+
+**/node_modules
+**/dist
+**/build
+**/artifacts
+**/cache
+**/typechain-types
+**/coverage
+**/.next
+**/.vite
+**/.turbo
+
+.git
+.gitignore
+.github
+.DS_Store
+.idea
+.vscode
+
+docs/superpowers/plans
+docs/superpowers/specs
+ui reference
+"project docs "
+*.md
+!packages/*/README.md
+
+.env
+.env.local
+.env.*.local

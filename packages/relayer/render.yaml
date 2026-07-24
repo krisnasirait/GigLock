@@ -1,0 +1,36 @@
+# Render Blueprint: one-click deploy for the GigLock relayer.
+# Provisioned via https://render.com/blueprints → New Blueprint Instance → point at this repo.
+#
+# Render auto-detects the Dockerfile at packages/relayer/Dockerfile (we point to it explicitly).
+# The service URL becomes https://giglock-relayer.onrender.com by default.
+
+services:
+  - type: web
+    name: giglock-relayer
+    runtime: docker
+    rootDir: packages/relayer
+    dockerfilePath: ./Dockerfile
+    dockerContext: ../..
+    plan: starter        # Render free tier; upgrade to "standard" ($7/mo) for always-warm
+    region: oregon       # closest GIWA RPC region; change if your RPC lives elsewhere
+    healthCheckPath: /health
+    autoDeploy: true     # redeploy on push to main
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: 8080
+      - key: RELAYER_PRIVATE_KEY
+        sync: false       # set manually in Render dashboard; encrypted at rest
+      - key: RPC_URL
+        value: https://sepolia-rpc.giwa.io
+      - key: CHAIN_ID
+        value: "91342"
+      - key: MINIMAL_FORWARDER_ADDRESS
+        sync: false       # set after MinimalForwarder.sol deploy (see docs/DEPLOY.md §10.5)
+      - key: ALLOWED_ORIGINS
+        value: ""         # set to your Vercel frontend URL, comma-separated if multiple
+      - key: RATE_LIMIT_PER_MIN
+        value: "60"
