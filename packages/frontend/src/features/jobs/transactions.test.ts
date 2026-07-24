@@ -1,7 +1,24 @@
-import { describe, expect, it, vi } from "vitest";
-import { encodeEventTopics, type Address, type Hash, type Hex } from "viem";
-import { JobFactoryAbi } from "@giglock/shared";
-import { jobsKeys } from "./queries.js";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { QueryClient } from "@tanstack/react-query";
+import {
+  encodeEventTopics,
+  type Address,
+  type Hash,
+  type Hex,
+  type TransactionReceipt,
+} from "viem";
+import { EscrowJobAbi, JobFactoryAbi } from "@giglock/shared";
+
+vi.mock("../../lib/wagmi.js", () => ({
+  ACTIVE_CHAIN_ID: 91342,
+  publicClient: {
+    getContractEvents: vi.fn(),
+    multicall: vi.fn(),
+    readContract: vi.fn(),
+  },
+}));
+
+import { jobsKeys, loadWorkerJobs } from "./queries.js";
 import {
   decodeCreatedJobAddress,
   invalidateJobQueries,
@@ -9,16 +26,27 @@ import {
   runCreate,
   runFund,
 } from "./transactions.js";
+import { publicClient } from "../../lib/wagmi.js";
 
 const factory = "0x1111111111111111111111111111111111111111" as Address;
 const job = "0x2222222222222222222222222222222222222222" as Address;
 const account = "0x3333333333333333333333333333333333333333" as Address;
 const otherFactory = "0x4444444444444444444444444444444444444444" as Address;
-type TestReceipt = {
-  logs: Array<{ address: Address; topics: [Hex, ...Hex[]]; data: Hex }>;
+type TestReceipt = TransactionReceipt;
+function testReceipt(value: object): TestReceipt {
+  return value as TestReceipt;
+}
+const chain = publicClient as unknown as {
+  getContractEvents: ReturnType<typeof vi.fn>;
+  multicall: ReturnType<typeof vi.fn>;
+  readContract: ReturnType<typeof vi.fn>;
 };
 
 describe("job transaction workflows", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("resumes creation without creating a second job", () => {
     expect(nextCreateStep({ metadataCid: "bafy", jobAddress: undefined, allowance: 0n }, 5n)).toBe(
       "create",
@@ -45,19 +73,19 @@ describe("job transaction workflows", () => {
 
     expect(
       decodeCreatedJobAddress(
-        {
+        testReceipt({
           logs: [
             { address: otherFactory, topics, data },
             { address: factory, topics, data },
           ],
-        },
+        }),
         factory,
       ),
     ).toBe(job);
   });
 
   it("fails when a create receipt does not contain its factory JobCreated event", () => {
-    expect(() => decodeCreatedJobAddress({ logs: [] }, factory)).toThrow("JobCreated");
+    expect(() => decodeCreatedJobAddress(testReceipt({ logs: [] }), factory)).toThrow("JobCreated");
   });
 
   it("invalidates only the job and affected account balance cache keys", () => {
@@ -66,9 +94,29 @@ describe("job transaction workflows", () => {
     void invalidateJobQueries({ invalidateQueries }, { jobAddress: job, accounts: [account] });
 
     expect(invalidateQueries).toHaveBeenCalledTimes(3);
-    expect(invalidateQueries).toHaveBeenNthCalledWith(1, { queryKey: jobsKeys.all });
+    expect(invalidateQueries).toHaveBeenNthCalledWith(1, {
+      queryKey: jobsKeys.all,
+      exact: true,
+    });
     expect(invalidateQueries).toHaveBeenNthCalledWith(2, { queryKey: jobsKeys.detail(job) });
     expect(invalidateQueries).toHaveBeenNthCalledWith(3, { queryKey: jobsKeys.balances(account) });
+  });
+
+  it("keeps unrelated detail and balance entries valid in the real query cache", async () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(jobsKeys.all, "all jobs");
+    queryClient.setQueryData(jobsKeys.detail(job), "target job");
+    queryClient.setQueryData(jobsKeys.detail(otherFactory), "other job");
+    queryClient.setQueryData(jobsKeys.balances(account), "target balance");
+    queryClient.setQueryData(jobsKeys.balances(otherFactory), "other balance");
+
+    await invalidateJobQueries(queryClient, { jobAddress: job, accounts: [account] });
+
+    expect(queryClient.getQueryState(jobsKeys.all)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(jobsKeys.detail(job))?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(jobsKeys.balances(account))?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(jobsKeys.detail(otherFactory))?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(jobsKeys.balances(otherFactory))?.isInvalidated).toBe(false);
   });
 
   it("does not report creation success before its receipt is confirmed", async () => {
@@ -96,7 +144,8 @@ describe("job transaction workflows", () => {
     await Promise.resolve();
     expect(waitForReceipt).toHaveBeenCalledWith({ hash: "0xabc" });
 
-    const receipt: TestReceipt = {
+    const receipt = testReceipt({
+      status: "success",
       logs: [
         {
           address: factory,
@@ -112,7 +161,7 @@ describe("job transaction workflows", () => {
             "6261667900000000000000000000000000000000000000000000000000000000") as Hex,
         },
       ],
-    };
+    });
     resolveReceipt!(receipt);
 
     await expect(pending).resolves.toMatchObject({ hash: "0xabc", jobAddress: job });
@@ -122,9 +171,50 @@ describe("job transaction workflows", () => {
     await expect(
       runFund({
         writeContract: vi.fn().mockResolvedValue("0xabc" as Hash),
-        waitForReceipt: vi.fn().mockResolvedValue({ logs: [], status: "reverted" }),
+        waitForReceipt: vi.fn().mockResolvedValue(testReceipt({ logs: [], status: "reverted" })),
         request: { address: job },
       }),
-    ).rejects.toThrow("reverted");
+    ).rejects.toThrow("successful");
+  });
+
+  it("does not advance a write workflow when a receipt has no success status", async () => {
+    await expect(
+      runFund({
+        writeContract: vi.fn().mockResolvedValue("0xabc" as Hash),
+        waitForReceipt: vi.fn().mockResolvedValue(testReceipt({ logs: [] })),
+        request: { address: job },
+      }),
+    ).rejects.toThrow("successful");
+  });
+
+  it("accepts a viem receipt waiter whose receipt contains a LOG0", async () => {
+    const waitForReceipt = async (): Promise<TransactionReceipt> =>
+      ({
+        status: "success",
+        logs: [{ address: job, data: "0x", topics: [] }],
+      }) as unknown as TransactionReceipt;
+
+    await expect(
+      runFund({
+        writeContract: vi.fn().mockResolvedValue("0xabc" as Hash),
+        waitForReceipt,
+        request: { address: job },
+      }),
+    ).resolves.toMatchObject({ hash: "0xabc" });
+  });
+
+  it("discovers worker jobs from worker-filtered JobAccepted events before hydration", async () => {
+    chain.getContractEvents.mockResolvedValue([{ address: job }]);
+    chain.multicall.mockResolvedValue([2, factory, account, 5n, "not-a-valid-cid", 0n]);
+
+    await expect(loadWorkerJobs(account)).resolves.toMatchObject([
+      { address: job, worker: account },
+    ]);
+    expect(chain.getContractEvents).toHaveBeenCalledWith({
+      abi: EscrowJobAbi,
+      eventName: "JobAccepted",
+      args: { worker: account },
+      strict: true,
+    });
   });
 });

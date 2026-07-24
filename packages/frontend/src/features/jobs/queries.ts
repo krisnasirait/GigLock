@@ -1,5 +1,5 @@
 import { EscrowJobAbi, JobFactoryAbi, addressesByChain } from "@giglock/shared";
-import { isAddressEqual, type Address } from "viem";
+import { type Address } from "viem";
 import { ACTIVE_CHAIN_ID, publicClient } from "../../lib/wagmi.js";
 import { fetchJobMetadata } from "./ipfs.js";
 import type { JobMetadataV1, MilestoneTuple } from "./model.js";
@@ -134,5 +134,14 @@ export async function loadJob(address: Address): Promise<JobChainSnapshot> {
 }
 
 export async function loadWorkerJobs(account: Address): Promise<JobChainSnapshot[]> {
-  return (await loadAllJobs()).filter((job) => isAddressEqual(job.worker, account));
+  const acceptedJobs = await publicClient.getContractEvents({
+    abi: EscrowJobAbi,
+    eventName: "JobAccepted",
+    args: { worker: account },
+    strict: true,
+  });
+  const addresses = [
+    ...new Map(acceptedJobs.map((event) => [event.address.toLowerCase(), event.address])).values(),
+  ];
+  return loadSnapshots(addresses);
 }

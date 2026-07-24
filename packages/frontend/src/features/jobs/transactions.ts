@@ -1,5 +1,11 @@
 import { JobFactoryAbi } from "@giglock/shared";
-import { decodeEventLog, isAddressEqual, type Address, type Hash, type Hex } from "viem";
+import {
+  decodeEventLog,
+  isAddressEqual,
+  type Address,
+  type Hash,
+  type TransactionReceipt,
+} from "viem";
 import { jobsKeys } from "./queries.js";
 
 export type CreateWorkflowState = {
@@ -19,12 +25,13 @@ export type WorkflowEvent =
   | { type: "failed" };
 export type WorkflowState = { action: WorkflowAction; phase: WorkflowPhase; hash?: Hash };
 
-type ReceiptLog = { address: Address; topics: [Hex, ...Hex[]]; data: Hex };
-type ReceiptWithLogs = { logs: readonly ReceiptLog[]; status?: "success" | "reverted" };
 type ContractWriter = (request: Record<string, unknown>) => Promise<Hash>;
-type ReceiptWaiter = (parameters: { hash: Hash }) => Promise<ReceiptWithLogs>;
+type ReceiptWaiter = (parameters: { hash: Hash }) => Promise<TransactionReceipt>;
 type Invalidator = {
-  invalidateQueries: (filters: { queryKey: readonly unknown[] }) => Promise<unknown>;
+  invalidateQueries: (filters: {
+    queryKey: readonly unknown[];
+    exact?: boolean;
+  }) => Promise<unknown>;
 };
 
 export function nextCreateStep(state: CreateWorkflowState, total: bigint): CreateStep {
@@ -57,9 +64,13 @@ export const workflowReducers: Record<WorkflowAction, typeof reduceWorkflow> = {
   confirm: reduceWorkflow,
 };
 
-export function decodeCreatedJobAddress(receipt: ReceiptWithLogs, factory: Address): Address {
+export function decodeCreatedJobAddress(
+  receipt: Pick<TransactionReceipt, "logs">,
+  factory: Address,
+): Address {
   for (const log of receipt.logs) {
     if (!isAddressEqual(log.address, factory)) continue;
+    if (log.topics.length === 0) continue;
     try {
       const decoded = decodeEventLog({
         abi: JobFactoryAbi,
@@ -81,23 +92,23 @@ export async function invalidateJobQueries(
   queryClient: Invalidator,
   input: { jobAddress?: Address; accounts?: Address[] },
 ): Promise<void> {
-  const keys: readonly (readonly unknown[])[] = [
-    jobsKeys.all,
-    ...(input.jobAddress === undefined ? [] : [jobsKeys.detail(input.jobAddress)]),
-    ...(input.accounts ?? []).map(jobsKeys.balances),
+  const invalidations: Array<{ queryKey: readonly unknown[]; exact?: boolean }> = [
+    { queryKey: jobsKeys.all, exact: true },
+    ...(input.jobAddress === undefined ? [] : [{ queryKey: jobsKeys.detail(input.jobAddress) }]),
+    ...(input.accounts ?? []).map((account) => ({ queryKey: jobsKeys.balances(account) })),
   ];
-  await Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
+  await Promise.all(invalidations.map((entry) => queryClient.invalidateQueries(entry)));
 }
 
 async function runConfirmedTransaction(input: {
   writeContract: ContractWriter;
   waitForReceipt: ReceiptWaiter;
   request: Record<string, unknown>;
-}): Promise<{ hash: Hash; receipt: ReceiptWithLogs }> {
+}): Promise<{ hash: Hash; receipt: TransactionReceipt }> {
   const hash = await input.writeContract(input.request);
   const receipt = await input.waitForReceipt({ hash });
-  if (receipt.status === "reverted") {
-    throw new Error(`Transaction ${hash} reverted before confirmation.`);
+  if (receipt.status !== "success") {
+    throw new Error(`Transaction ${hash} did not receive a successful receipt.`);
   }
   return { hash, receipt };
 }
@@ -107,7 +118,7 @@ export async function runCreate(input: {
   waitForReceipt: ReceiptWaiter;
   request: Record<string, unknown>;
   factory: Address;
-}): Promise<{ hash: Hash; receipt: ReceiptWithLogs; jobAddress: Address }> {
+}): Promise<{ hash: Hash; receipt: TransactionReceipt; jobAddress: Address }> {
   const { hash, receipt } = await runConfirmedTransaction(input);
   return { hash, receipt, jobAddress: decodeCreatedJobAddress(receipt, input.factory) };
 }
