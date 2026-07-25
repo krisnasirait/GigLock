@@ -25,39 +25,49 @@ export function Navbar() {
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         scrolled
-          ? 'bg-[#030712]/90 backdrop-blur-xl border-b border-white/5'
+          ? 'bg-[#050b08]/90 backdrop-blur-xl border-b border-[#10b981]/15 shadow-lg shadow-black/40'
           : 'bg-transparent'
       }`}
     >
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-2.5 group">
-          <div className="relative size-9">
-            <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-[#3b82f6] to-[#7c3aed] opacity-80 group-hover:opacity-100 transition-opacity" />
-            <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-[#3b82f6] to-[#7c3aed] blur-md opacity-40 group-hover:opacity-70 transition-opacity" />
+        <Link to="/" className="flex items-center gap-3 group">
+          <div className="relative size-9 flex items-center justify-center">
+            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-[#10b981] to-[#059669] opacity-90 group-hover:opacity-100 transition-opacity shadow-[0_0_15px_rgba(16,185,129,0.4)]" />
+            <div className="absolute inset-0 rounded-xl bg-[#10b981] blur-md opacity-30 group-hover:opacity-60 transition-opacity" />
             <svg
-              className="absolute inset-0 w-full h-full p-2"
+              className="relative size-5 text-slate-950"
               viewBox="0 0 24 24"
               fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              <path
-                d="M12 2L4 6v6c0 5.5 3.8 10.7 8 12 4.2-1.3 8-6.5 8-12V6l-8-4z"
-                fill="white"
-                opacity="0.9"
-              />
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
           </div>
-          <span className="text-lg font-bold tracking-tight">GigLock</span>
+          <div className="flex flex-col">
+            <span className="text-xl font-black tracking-tight text-white group-hover:text-[#34d399] transition-colors">
+              GigLock
+            </span>
+            <span className="text-[9px] font-bold text-[#10b981] tracking-widest uppercase -mt-1">
+              Autonomous Escrow
+            </span>
+          </div>
         </Link>
 
         {/* Desktop nav */}
-        <div className="hidden md:flex items-center gap-8">
+        <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#08120d]/80 border border-[#10b981]/15 backdrop-blur-md">
           {navLinks.map((link) => (
             <Link
               key={link.href}
               to={link.href}
-              className={`nav-link text-sm font-medium ${
-                location.pathname === link.href ? 'text-white' : 'text-white/60'
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                location.pathname === link.href
+                  ? 'bg-[#10b981]/20 text-[#34d399] border border-[#10b981]/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
+                  : 'text-white/70 hover:text-white hover:bg-white/5'
               }`}
             >
               {link.label}
@@ -65,8 +75,13 @@ export function Navbar() {
           ))}
         </div>
 
-        {/* Wallet connect */}
-        <div className="hidden md:block">
+        {/* Action items & Wallet */}
+        <div className="hidden md:flex items-center gap-3">
+          <Link to="/app">
+            <button className="btn-primary text-xs px-5 py-2.5 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+              Launch dApp
+            </button>
+          </Link>
           <ConnectButton showBalance={false} chainStatus="icon" accountStatus="address" />
         </div>
 
@@ -87,7 +102,7 @@ export function Navbar() {
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <div className="md:hidden bg-[#0a0e22]/95 backdrop-blur-xl border-t border-white/5 px-6 py-4 flex flex-col gap-4">
+        <div className="md:hidden bg-[#07100c]/95 backdrop-blur-2xl border-t border-[#10b981]/15 px-6 py-5 flex flex-col gap-4">
           {navLinks.map((link) => (
             <Link
               key={link.href}
@@ -98,7 +113,12 @@ export function Navbar() {
               {link.label}
             </Link>
           ))}
-          <div className="pt-2">
+          <div className="pt-2 flex flex-col gap-3">
+            <Link to="/app" onClick={() => setMobileOpen(false)}>
+              <button className="btn-primary w-full text-xs py-3">
+                Launch dApp
+              </button>
+            </Link>
             <ConnectButton showBalance={false} chainStatus="icon" accountStatus="address" />
           </div>
         </div>

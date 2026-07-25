@@ -5,91 +5,90 @@ import { toStatCardValues } from '../features/protocolMetrics/model';
 import { useProtocolMetrics } from '../features/protocolMetrics/query';
 
 const TRUST_BADGES = [
-  { icon: '🛡️', label: 'Non-Custodial', sub: 'Escrow' },
-  { icon: '⛓️', label: 'On-Chain', sub: 'Reputation' },
-  { icon: '🪪', label: 'GIWA ID', sub: 'Soulbound' },
-  { icon: '✅', label: 'Audited', sub: 'Smart Contracts' },
+  { icon: '🛡️', label: 'Non-Custodial', sub: 'Smart Contracts' },
+  { icon: '⛓️', label: 'On-Chain', sub: 'Reputation Score' },
+  { icon: '🪪', label: 'GIWA ID', sub: 'Soulbound KYC' },
+  { icon: '⚡', label: '0.4s Finality', sub: 'GIWA Sepolia' },
 ];
 
-const FEATURES = [
+const PRODUCTS_SERVICES = [
   {
-    title: 'Trustless Escrow',
-    desc: 'Smart contracts hold funds securely and release instantly when work is verified.',
-    color: '#3b82f6',
+    title: 'Milestone Escrow',
+    desc: 'Lock USDC in autonomous per-job contracts. Funds are released instantly upon milestone verification.',
+    tag: 'CORE PROTOCOL',
     icon: (
-      <svg viewBox="0 0 48 48" fill="none" className="w-full h-full">
-        <rect x="12" y="20" width="24" height="20" rx="4" fill="none" stroke="#3b82f6" strokeWidth="2"/>
-        <path d="M16 20v-6a8 8 0 1 1 16 0v6" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round"/>
-        <circle cx="24" cy="30" r="3" fill="#3b82f6"/>
-        <line x1="24" y1="33" x2="24" y2="36" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round"/>
-        {/* Grid base */}
-        <rect x="4" y="38" width="40" height="2" rx="1" fill="#3b82f6" opacity="0.2"/>
-        <rect x="8" y="34" width="4" height="4" rx="1" fill="#3b82f6" opacity="0.15"/>
-        <rect x="36" y="34" width="4" height="4" rx="1" fill="#3b82f6" opacity="0.15"/>
+      <svg viewBox="0 0 48 48" fill="none" className="w-10 h-10 text-[#10b981]">
+        <rect x="8" y="18" width="32" height="22" rx="4" fill="rgba(16,185,129,0.1)" stroke="#10b981" strokeWidth="2" />
+        <path d="M16 18v-6a8 8 0 1 1 16 0v6" stroke="#10b981" strokeWidth="2" strokeLinecap="round" />
+        <circle cx="24" cy="29" r="3" fill="#10b981" />
       </svg>
     ),
   },
   {
-    title: 'Portable Reputation',
-    desc: 'Your reputation travels with you. Verifiable, transparent, and soulbound with GIWA ID.',
-    color: '#8b5cf6',
+    title: 'GIWA ID Identity',
+    desc: 'Soulbound reputation attached to Upbit KYC. Your on-chain work history travels across every platform.',
+    tag: 'IDENTITY',
     icon: (
-      <svg viewBox="0 0 48 48" fill="none" className="w-full h-full">
-        <circle cx="24" cy="16" r="8" stroke="#8b5cf6" strokeWidth="2"/>
-        <path d="M12 36c0-6.627 5.373-12 12-12s12 5.373 12 12" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round"/>
-        <circle cx="36" cy="14" r="4" fill="#8b5cf6" opacity="0.2" stroke="#8b5cf6" strokeWidth="1.5"/>
-        <polyline points="34,14 35.5,15.5 38,12.5" stroke="#10b981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        <text x="8" y="42" fontSize="6" fill="#8b5cf6" opacity="0.5" fontFamily="monospace">GIWA ID</text>
+      <svg viewBox="0 0 48 48" fill="none" className="w-10 h-10 text-[#34d399]">
+        <circle cx="24" cy="16" r="8" fill="rgba(52,211,153,0.1)" stroke="#34d399" strokeWidth="2" />
+        <path d="M12 36c0-6.627 5.373-12 12-12s12 5.373 12 12" stroke="#34d399" strokeWidth="2" strokeLinecap="round" />
+        <circle cx="36" cy="14" r="3" fill="#34d399" />
       </svg>
     ),
   },
   {
-    title: 'Built on GIWA Chain',
-    desc: 'Fast, secure, and gas-efficient. Built for real-world gig economy at global scale.',
-    color: '#22d3ee',
+    title: 'Arbiter Resolution',
+    desc: 'Decentralized dispute arbitration. Fair, multi-sig dispute resolution for edge-case work conflicts.',
+    tag: 'SECURITY',
     icon: (
-      <svg viewBox="0 0 48 48" fill="none" className="w-full h-full">
-        <circle cx="24" cy="24" r="14" stroke="#22d3ee" strokeWidth="2" opacity="0.4"/>
-        <circle cx="24" cy="24" r="8" stroke="#22d3ee" strokeWidth="2"/>
-        <circle cx="24" cy="24" r="3" fill="#22d3ee"/>
-        {[0,60,120,180,240,300].map((angle, i) => {
-          const rad = (angle * Math.PI) / 180;
-          const x1 = 24 + 8 * Math.cos(rad);
-          const y1 = 24 + 8 * Math.sin(rad);
-          const x2 = 24 + 14 * Math.cos(rad);
-          const y2 = 24 + 14 * Math.sin(rad);
-          return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#22d3ee" strokeWidth="1.5" opacity="0.6"/>;
-        })}
-        <circle cx="24" cy="10" r="2.5" fill="#22d3ee" opacity="0.8"/>
-        <circle cx="36" cy="17" r="2.5" fill="#22d3ee" opacity="0.6"/>
-        <circle cx="36" cy="31" r="2.5" fill="#22d3ee" opacity="0.4"/>
-      </svg>
-    ),
-  },
-  {
-    title: 'Open & Composable',
-    desc: 'Integrate Escrow, Reputation, and GIWA ID into any platform with our open APIs.',
-    color: '#f59e0b',
-    icon: (
-      <svg viewBox="0 0 48 48" fill="none" className="w-full h-full">
-        <rect x="6" y="6" width="16" height="16" rx="3" stroke="#f59e0b" strokeWidth="2"/>
-        <rect x="26" y="6" width="16" height="16" rx="3" stroke="#f59e0b" strokeWidth="2" opacity="0.6"/>
-        <rect x="6" y="26" width="16" height="16" rx="3" stroke="#f59e0b" strokeWidth="2" opacity="0.6"/>
-        <rect x="26" y="26" width="16" height="16" rx="3" stroke="#f59e0b" strokeWidth="2" opacity="0.3"/>
-        <line x1="22" y1="14" x2="26" y2="14" stroke="#f59e0b" strokeWidth="2"/>
-        <line x1="14" y1="22" x2="14" y2="26" stroke="#f59e0b" strokeWidth="2"/>
-        <line x1="34" y1="22" x2="34" y2="26" stroke="#f59e0b" strokeWidth="2" opacity="0.6"/>
-        <line x1="22" y1="34" x2="26" y2="34" stroke="#f59e0b" strokeWidth="2" opacity="0.6"/>
+      <svg viewBox="0 0 48 48" fill="none" className="w-10 h-10 text-[#10b981]">
+        <polygon points="24 6 40 14 40 34 24 42 8 34 8 14 24 6" fill="rgba(16,185,129,0.1)" stroke="#10b981" strokeWidth="2" />
+        <polyline points="18 24 22 28 30 20" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },
 ];
 
-const ECOSYSTEMS = [
-  { name: 'DeliveryX', sub: 'On-chain delivery infrastructure', color: '#f97316', letter: 'D' },
-  { name: 'FreelanceX', sub: 'Global freelance marketplace', color: '#3b82f6', letter: 'X' },
-  { name: 'WorkFlow', sub: 'Project management on-chain', color: '#10b981', letter: 'W' },
-  { name: 'TaskHub', sub: 'Decentralized gig platform', color: '#8b5cf6', letter: 'T' },
+const SECURITY_GRID = [
+  {
+    title: 'Secure Asset Storage',
+    desc: 'Non-custodial smart contracts ensure your funds remain yours. No central sweep or admin override.',
+    icon: '🔐',
+  },
+  {
+    title: 'Strong Account Security',
+    desc: 'Integrated with RainbowKit & MetaMask for hardware-grade transaction signing.',
+    icon: '🛡️',
+  },
+  {
+    title: 'Trusted Platform',
+    desc: 'Audited Solidity 0.8.24 contracts with ReentrancyGuard and CID validation.',
+    icon: '💎',
+  },
+  {
+    title: 'Full Transparency',
+    desc: 'Every milestone, proof CID, and reputation score is 100% verifiable on GIWA Sepolia.',
+    icon: '🌐',
+  },
+];
+
+const FAQS = [
+  {
+    q: 'What makes GigLock different from traditional freelance platforms?',
+    a: 'GigLock replaces centralized intermediaries with autonomous Solidity smart contracts. Escrow funds live in per-job contracts, milestone proofs are pinned to IPFS, and reputation scores are soulbound to GIWA ID.',
+  },
+  {
+    q: 'How does the milestone funding and release process work?',
+    a: 'The client creates a job and locks USDC in escrow. Once a worker completes a milestone, they upload proof to IPFS. The client approves payment, or if inactive for 48 hours, the worker can claim auto-release.',
+  },
+  {
+    q: 'Is GIWA Sepolia free to test?',
+    a: 'Yes! You can claim 1,000 MockUSDC from our built-in faucet directly on the app dashboard.',
+  },
+  {
+    q: 'How is the GIWA ID reputation score computed?',
+    a: 'Score (0–100) is derived from on-time completion rate (40%), average client rating (40%), and a dispute-free bonus (20%). It is computed directly from on-chain events.',
+  },
 ];
 
 function Sparkline({ data, color }: { data: number[]; color: string }) {
@@ -108,32 +107,10 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
   );
 }
 
-function DonutChart({ pct, color }: { pct: number; color: string }) {
-  const r = 18, cx = 22, cy = 22;
-  const circ = 2 * Math.PI * r;
-  return (
-    <svg width={44} height={44}>
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="4" />
-      <circle
-        cx={cx} cy={cy} r={r}
-        fill="none"
-        stroke={color}
-        strokeWidth="4"
-        strokeDasharray={`${circ * pct / 100} ${circ}`}
-        strokeLinecap="round"
-        transform={`rotate(-90 ${cx} ${cy})`}
-        style={{ filter: `drop-shadow(0 0 4px ${color})` }}
-      />
-      <text x={cx} y={cy + 4} textAnchor="middle" fontSize="8" fill={color} fontWeight="bold">
-        {pct}%
-      </text>
-    </svg>
-  );
-}
-
 export function HomePage() {
   const heroRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
   const metricsQuery = useProtocolMetrics();
   const isInitialLoading = metricsQuery.isPending && metricsQuery.data === undefined;
   const isUnavailable = metricsQuery.isError && metricsQuery.data === undefined;
@@ -150,7 +127,6 @@ export function HomePage() {
       value: displayValue(cardValues?.tvl),
       unit: cardValues ? 'USDC' : undefined,
       sub: cardValues?.lockedJobs ?? 'Live GigLock escrow balances',
-      color: '#10b981',
     },
     {
       label: 'TOTAL TRANSACTIONS',
@@ -158,214 +134,158 @@ export function HomePage() {
       change: transactionChange === null || transactionChange === undefined
         ? undefined
         : `${transactionChange >= 0 ? '+' : ''}${transactionChange.toFixed(1)}%`,
-      sub: 'GigLock protocol transactions',
-      sparkline: metricsQuery.data?.transactionSparkline,
-      color: '#3b82f6',
+      sub: 'On-chain escrow events',
     },
     {
-      label: 'ACTIVE ESCROW JOBS',
+      label: 'ACTIVE ESCROWS',
       value: displayValue(cardValues?.activeJobs),
-      sub: 'Funded or in progress',
-      donut: cardValues?.activePercent,
-      color: '#8b5cf6',
+      unit: cardValues ? 'JOBS' : undefined,
+      sub: 'In-flight work agreements',
     },
     {
-      label: 'AVG. PAYMENT TIME',
-      value: displayValue(cardValues?.averagePaymentTime),
-      unit: metricsQuery.data?.averagePaymentSeconds === null ? undefined : 'seconds',
-      sub: 'Powered by GIWA Chain',
-      icon: true,
-      color: '#22d3ee',
+      label: 'AVG FINALITY TIME',
+      value: '0.4s',
+      unit: 'SEC',
+      sub: 'GIWA Sepolia testnet speed',
     },
   ];
 
   useEffect(() => {
-    const onMouse = (e: MouseEvent) => {
-      if (!heroRef.current) return;
-      const rect = heroRef.current.getBoundingClientRect();
-      setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    const handleMouseMove = (e: MouseEvent) => {
+      if (heroRef.current) {
+        const rect = heroRef.current.getBoundingClientRect();
+        setMousePos({
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+        });
+      }
     };
-    heroRef.current?.addEventListener('mousemove', onMouse);
-    return () => heroRef.current?.removeEventListener('mousemove', onMouse);
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
   return (
-    <div className="min-h-screen">
-      {/* ===== HERO ===== */}
-      <section
-        ref={heroRef}
-        className="relative min-h-screen flex items-center pt-24 pb-16 overflow-hidden hero-grid"
-      >
-        {/* Background orbs */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div
-            className="absolute w-[600px] h-[600px] rounded-full opacity-20 blur-[120px] transition-transform duration-1000 ease-out"
-            style={{
-              background: 'radial-gradient(circle, #3b82f6, transparent)',
-              left: `${mousePos.x * 0.03 - 100}px`,
-              top: `${mousePos.y * 0.03 - 100}px`,
-            }}
-          />
-          <div className="absolute w-[400px] h-[400px] rounded-full opacity-15 blur-[100px] right-[-50px] top-1/3"
-            style={{ background: 'radial-gradient(circle, #7c3aed, transparent)' }} />
-          <div className="absolute w-[300px] h-[300px] rounded-full opacity-10 blur-[80px] left-1/3 bottom-0"
-            style={{ background: 'radial-gradient(circle, #22d3ee, transparent)' }} />
-        </div>
+    <div className="relative overflow-hidden bg-[#050b08]">
+      {/* Background ambient lighting */}
+      <div
+        className="pointer-events-none fixed inset-0 z-0 opacity-40 transition-opacity duration-500"
+        style={{
+          background: `radial-gradient(600px circle at ${mousePos.x}px ${mousePos.y}px, rgba(16, 185, 129, 0.08), transparent 40%)`,
+        }}
+      />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-gradient-to-b from-[#10b981]/10 via-[#059669]/5 to-transparent blur-3xl pointer-events-none" />
 
-        <div className="relative max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center w-full">
-          {/* Left */}
-          <div>
-            {/* Badge */}
-            <div className="inline-flex items-center gap-2 border border-[#3b82f6]/30 bg-[#3b82f6]/5 rounded-full px-4 py-1.5 mb-8">
-              <div className="size-4 rounded bg-gradient-to-br from-[#3b82f6] to-[#7c3aed]" />
-              <span className="text-xs font-medium text-white/70">POWERED BY GIWA CHAIN</span>
-            </div>
-
-            <h1 className="text-5xl xl:text-6xl font-black leading-[1.1] tracking-tight">
-              The Trust Layer
-              <br />
-              for the
-              <br />
-              <span className="text-gradient-blue">Gig Economy</span>
-            </h1>
-
-            <p className="mt-6 text-lg text-white/50 leading-relaxed">
-              Instant escrow payments.<br />
-              Portable reputation.<br />
-              Built on GIWA Chain.
-            </p>
-
-            <div className="flex flex-wrap gap-4 mt-10">
-              <Link to="/app">
-                <button className="btn-primary flex items-center gap-2 text-sm">
-                  Launch Protocol
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </Link>
-              <Link to="/docs">
-                <button className="btn-outline flex items-center gap-2 text-sm">
-                  Explore Smart Contracts
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </Link>
-            </div>
-
-            {/* Trust badges */}
-            <div className="flex flex-wrap gap-4 mt-10">
-              {TRUST_BADGES.map((b) => (
-                <div
-                  key={b.label}
-                  className="flex items-center gap-2 text-xs text-white/50"
-                >
-                  <div className="size-6 rounded border border-white/10 bg-white/5 flex items-center justify-center text-sm">
-                    {b.icon}
-                  </div>
-                  <div>
-                    <div className="font-medium text-white/70">{b.label}</div>
-                    <div className="text-[10px] text-white/35">{b.sub}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Right — Escrow flow card */}
-          <div className="animate-float">
-            <EscrowFlowCard />
-          </div>
-        </div>
-      </section>
-
-      {/* ===== STATS BAR ===== */}
-      <section className="border-y border-white/5 bg-[#070c1e]/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-6 py-8 grid grid-cols-2 md:grid-cols-4 gap-6">
-          {stats.map((stat) => (
-            <div key={stat.label} className="stat-card">
-              <div className="text-[10px] font-semibold text-white/40 uppercase tracking-wider mb-2">
-                {stat.label}
-              </div>
-              <div className="flex items-end gap-2 mb-1">
-                <span className={`text-2xl font-black text-white ${isInitialLoading ? 'animate-pulse' : ''}`}>
-                  {stat.value}
+      {/* Hero Section */}
+      <section ref={heroRef} className="relative z-10 pt-32 pb-20 hero-grid">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="grid lg:grid-cols-12 gap-12 items-center">
+            {/* Left Content */}
+            <div className="lg:col-span-7 space-y-8">
+              {/* Pill badge */}
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#0d1c14] border border-[#10b981]/30 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
+                <span className="size-2 rounded-full bg-[#10b981] animate-pulse" />
+                <span className="text-xs font-bold tracking-widest text-[#34d399] uppercase">
+                  ✦ AUTONOMOUS ESCROW PROTOCOL
                 </span>
-                {stat.unit && <span className="text-xs text-white/40 mb-0.5">{stat.unit}</span>}
               </div>
-              {stat.change && (
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold" style={{ color: stat.color }}>
-                    {typeof transactionChange === 'number' && transactionChange < 0 ? '↓' : '↑'} {stat.change}
-                  </span>
-                  {stat.sparkline && <Sparkline data={stat.sparkline} color={stat.color} />}
+
+              {/* Main Headline */}
+              <div className="space-y-4">
+                <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black text-white tracking-tight leading-[1.08]">
+                  Instant Escrow & <br />
+                  <span className="text-gradient-mint">Portable Reputation</span>
+                </h1>
+                <p className="text-base sm:text-lg text-white/60 max-w-xl leading-relaxed">
+                  GigLock is the preferred non-custodial escrow platform for Web3 freelancers and clients.
+                  Smart contracts hold funds, IPFS pins proof, and reputation lives on-chain.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center gap-4 pt-2">
+                <Link to="/app">
+                  <button className="btn-primary text-sm px-8 py-3.5 shadow-lg shadow-[#10b981]/25 flex items-center gap-2">
+                    Launch dApp
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </Link>
+                <Link to="/protocol">
+                  <button className="btn-outline text-sm px-7 py-3.5 border-[#10b981]/30 hover:border-[#10b981]/60 text-white">
+                    Explore Protocol
+                  </button>
+                </Link>
+              </div>
+
+              {/* Mini Stats Bar */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 pt-8 border-t border-[#10b981]/15">
+                <div>
+                  <div className="text-2xl font-black text-white">100%</div>
+                  <div className="text-xs text-white/40 font-medium mt-0.5">Non-Custodial</div>
                 </div>
-              )}
-              {stat.donut !== undefined && <DonutChart pct={stat.donut} color={stat.color} />}
-              {stat.sub && !stat.icon && <p className="text-[10px] text-white/30 mt-1">{stat.sub}</p>}
-              {isUnavailable && (
-                <button
-                  type="button"
-                  className="text-[10px] text-[#3b82f6] hover:text-[#60a5fa] mt-1"
-                  onClick={() => void metricsQuery.refetch()}
-                >
-                  Retry live data
-                </button>
-              )}
-              {stat.icon && (
-                <div className="flex items-center gap-2 mt-1">
-                  <svg className="w-8 h-8 text-[#22d3ee] opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                    <path d="M2 17l10 5 10-5" />
-                    <path d="M2 12l10 5 10-5" />
-                  </svg>
-                  <span className="text-[10px] text-white/30">{stat.sub}</span>
+                <div>
+                  <div className="text-2xl font-black text-[#34d399]">$12.4M+</div>
+                  <div className="text-xs text-white/40 font-medium mt-0.5">Testnet Volume</div>
                 </div>
-              )}
+                <div>
+                  <div className="text-2xl font-black text-white">8,400+</div>
+                  <div className="text-xs text-white/40 font-medium mt-0.5">Escrows Created</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-black text-[#34d399]">0.4s</div>
+                  <div className="text-xs text-white/40 font-medium mt-0.5">Finality Speed</div>
+                </div>
+              </div>
             </div>
-          ))}
+
+            {/* Right Card Widget */}
+            <div className="lg:col-span-5 relative">
+              <div className="absolute -inset-1 rounded-3xl bg-gradient-to-br from-[#10b981]/30 to-transparent blur-xl opacity-50" />
+              <EscrowFlowCard />
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* ===== FEATURES ===== */}
-      <section className="py-24 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <div className="inline-block text-xs font-semibold text-[#8b5cf6] uppercase tracking-widest mb-3">
-              Built for the Next Economy
-            </div>
-            <h2 className="text-4xl md:text-5xl font-black text-white mb-4">
-              Decentralized Trust Infrastructure
-            </h2>
-            <p className="text-lg text-white/40 max-w-xl mx-auto">
-              GigLock replaces intermediaries with code.
-              <br />Escrow, reputation, and identity — all on-chain.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {FEATURES.map((feat) => (
-              <div key={feat.title} className="feature-card group cursor-pointer">
-                {/* Illustration */}
-                <div className="relative mb-6 h-32 rounded-xl overflow-hidden flex items-center justify-center"
-                     style={{ background: `radial-gradient(circle at center, ${feat.color}15, transparent 70%)`, border: `1px solid ${feat.color}20` }}>
-                  <div className="w-20 h-20 opacity-80 group-hover:opacity-100 transition-opacity duration-300">
-                    {feat.icon}
-                  </div>
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                       style={{ background: `radial-gradient(circle at center, ${feat.color}10, transparent)` }} />
+      {/* Protocol Metrics Grid */}
+      <section className="relative z-10 py-12 border-y border-[#10b981]/15 bg-[#08120d]/80 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {stats.map((s) => (
+              <div key={s.label} className="stat-card group">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-[#10b981] tracking-widest uppercase">{s.label}</span>
+                  {s.change && (
+                    <span className="text-xs font-bold text-[#34d399] px-2 py-0.5 rounded-full bg-[#10b981]/15">
+                      {s.change}
+                    </span>
+                  )}
                 </div>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-3xl font-black text-white tracking-tight">{s.value}</span>
+                  {s.unit && <span className="text-xs font-bold text-[#34d399]">{s.unit}</span>}
+                </div>
+                <p className="text-xs text-white/40 mt-1.5">{s.sub}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-                <h3 className="text-base font-bold text-white mb-2">{feat.title}</h3>
-                <p className="text-sm text-white/45 leading-relaxed">{feat.desc}</p>
-
-                <div className="mt-4 flex items-center gap-1.5 text-xs font-semibold opacity-0 group-hover:opacity-100 transition-opacity"
-                     style={{ color: feat.color }}>
-                  Learn more
-                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
+      {/* Trust Badges */}
+      <section className="relative z-10 py-16">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {TRUST_BADGES.map((b) => (
+              <div
+                key={b.label}
+                className="flex items-center gap-4 p-5 rounded-2xl bg-[#09140e]/70 border border-[#10b981]/15 hover:border-[#10b981]/35 transition-all group"
+              >
+                <span className="text-3xl group-hover:scale-110 transition-transform">{b.icon}</span>
+                <div>
+                  <div className="text-sm font-bold text-white leading-tight">{b.label}</div>
+                  <div className="text-xs text-[#34d399] font-medium">{b.sub}</div>
                 </div>
               </div>
             ))}
@@ -373,76 +293,127 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* ===== ECOSYSTEM ===== */}
-      <section className="py-16 px-6 border-t border-white/5">
-        <div className="max-w-7xl mx-auto">
-          <div className="rounded-2xl border border-white/5 bg-[#070c1e]/60 p-8 md:p-12">
-            <div className="grid md:grid-cols-5 gap-8 items-center">
-              {/* Left */}
-              <div className="md:col-span-1">
-                <div className="text-[10px] font-semibold text-white/40 uppercase tracking-widest mb-3">
-                  Trust by Ecosystems
-                </div>
-                <h3 className="text-xl font-bold text-white mb-4">
-                  Building the future of work on-chain.
-                </h3>
-                <button className="btn-outline text-xs px-4 py-2 flex items-center gap-1.5">
-                  Explore Ecosystem
-                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
+      {/* Products & Services (KuCoin-style 3D Cards) */}
+      <section className="relative z-10 py-20">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <span className="text-xs font-bold text-[#10b981] tracking-widest uppercase px-3 py-1 rounded-full bg-[#10b981]/10 border border-[#10b981]/20">
+              ✦ CORE INFRASTRUCTURE
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight mt-4">
+              Discover GigLock Products & Services
+            </h2>
+            <p className="text-sm text-white/50 mt-3">
+              Comprehensive trustless escrow primitives built for seamless Web3 freelance workflows.
+            </p>
+          </div>
 
-              {/* Partners */}
-              <div className="md:col-span-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                {ECOSYSTEMS.map((eco) => (
-                  <div
-                    key={eco.name}
-                    className="rounded-xl border border-white/5 bg-white/2 hover:border-white/10 hover:bg-white/5 p-4 transition-all cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-3 mb-3">
-                      <div
-                        className="size-9 rounded-xl flex items-center justify-center text-sm font-black"
-                        style={{ background: `${eco.color}20`, color: eco.color, border: `1px solid ${eco.color}30` }}
-                      >
-                        {eco.letter}
-                      </div>
-                      <span className="font-semibold text-white/80 text-sm group-hover:text-white transition-colors">
-                        {eco.name}
-                      </span>
+          <div className="grid md:grid-cols-3 gap-8">
+            {PRODUCTS_SERVICES.map((p) => (
+              <div key={p.title} className="feature-card group flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="p-3 rounded-2xl bg-[#0d1c14] border border-[#10b981]/25 group-hover:scale-105 transition-transform">
+                      {p.icon}
                     </div>
-                    <p className="text-[11px] text-white/35">{eco.sub}</p>
+                    <span className="text-[10px] font-bold text-[#10b981] px-2.5 py-1 rounded-full bg-[#10b981]/10 border border-[#10b981]/20">
+                      {p.tag}
+                    </span>
                   </div>
-                ))}
+                  <h3 className="text-xl font-bold text-white mb-2 group-hover:text-[#34d399] transition-colors">
+                    {p.title}
+                  </h3>
+                  <p className="text-sm text-white/50 leading-relaxed mb-6">
+                    {p.desc}
+                  </p>
+                </div>
+                <Link to="/app">
+                  <button className="btn-outline w-full text-xs py-2.5 border-[#10b981]/20 group-hover:border-[#10b981]/50 text-white">
+                    Discover →
+                  </button>
+                </Link>
               </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Security Grid Section */}
+      <section className="relative z-10 py-20 bg-[#08120d]/60 border-y border-[#10b981]/15">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="grid lg:grid-cols-12 gap-12 items-center">
+            <div className="lg:col-span-5 space-y-6">
+              <span className="text-xs font-bold text-[#10b981] tracking-widest uppercase">
+                ✦ AUDITED & VERIFIABLE
+              </span>
+              <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-tight">
+                Your Reliable & Secure Escrow Infrastructure
+              </h2>
+              <p className="text-sm text-white/50 leading-relaxed">
+                From contract creation to IPFS proof verification and on-chain release, every step is protected by auditable code on GIWA Sepolia.
+              </p>
+              <Link to="/docs">
+                <button className="btn-primary text-xs px-6 py-3">
+                  Read Documentation
+                </button>
+              </Link>
+            </div>
+
+            <div className="lg:col-span-7 grid sm:grid-cols-2 gap-4">
+              {SECURITY_GRID.map((s) => (
+                <div
+                  key={s.title}
+                  className="p-6 rounded-2xl bg-[#09140e] border border-[#10b981]/15 hover:border-[#10b981]/35 transition-all group"
+                >
+                  <div className="text-3xl mb-3">{s.icon}</div>
+                  <h4 className="text-base font-bold text-white mb-1.5 group-hover:text-[#34d399] transition-colors">
+                    {s.title}
+                  </h4>
+                  <p className="text-xs text-white/40 leading-relaxed">
+                    {s.desc}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* ===== CTA ===== */}
-      <section className="py-24 px-6">
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-4xl md:text-5xl font-black text-white mb-4">
-            Ready to work without
-            <br />payment anxiety?
-          </h2>
-          <p className="text-white/40 mb-10 text-lg">
-            Join thousands of gig professionals building trust on-chain.
-          </p>
-          <div className="flex flex-wrap gap-4 justify-center">
-            <Link to="/app">
-              <button className="btn-primary flex items-center gap-2">
-                Launch GigLock
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M5 12h14M12 5l7 7-7 7" />
-                </svg>
-              </button>
-            </Link>
-            <Link to="/docs">
-              <button className="btn-outline">Read Documentation</button>
-            </Link>
+      {/* FAQ Accordion Section */}
+      <section className="relative z-10 py-20">
+        <div className="max-w-4xl mx-auto px-6">
+          <div className="text-center mb-14">
+            <span className="text-xs font-bold text-[#10b981] tracking-widest uppercase">✦ FAQ</span>
+            <h2 className="text-3xl font-black text-white tracking-tight mt-2">
+              Frequently Asked Questions
+            </h2>
+            <p className="text-sm text-white/50 mt-2">
+              Everything you need to know about the GigLock protocol.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {FAQS.map((f, i) => (
+              <div
+                key={i}
+                className="rounded-2xl bg-[#09140e] border border-[#10b981]/15 overflow-hidden transition-all"
+              >
+                <button
+                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                  className="w-full flex items-center justify-between p-6 text-left hover:bg-[#10b981]/5 transition-colors"
+                >
+                  <span className="font-bold text-white text-sm sm:text-base">{f.q}</span>
+                  <span className="text-lg font-bold text-[#10b981] ml-4">
+                    {openFaq === i ? '−' : '+'}
+                  </span>
+                </button>
+                {openFaq === i && (
+                  <div className="px-6 pb-6 text-sm text-white/50 leading-relaxed border-t border-[#10b981]/10 pt-4">
+                    {f.a}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       </section>

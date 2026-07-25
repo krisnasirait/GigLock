@@ -1,37 +1,38 @@
 import { useEffect, useState } from 'react';
 
-const BLOCK_TIME = 1.02;
-const INITIAL_BLOCK = 8392921;
+const BLOCK_TIME = 0.4;
+const INITIAL_BLOCK = 9182741;
 
 export function BlockchainFooter() {
   const [block, setBlock] = useState(INITIAL_BLOCK);
   const [gas, setGas] = useState('0.001');
-  const [tps, setTps] = useState(2892);
+  const [tps, setTps] = useState(3420);
 
   useEffect(() => {
     const interval = setInterval(() => {
       setBlock((b) => b + 1);
       setGas((parseFloat(gas) + (Math.random() * 0.0002 - 0.0001)).toFixed(4));
       setTps((t) => t + Math.floor(Math.random() * 20 - 10));
-    }, 3000);
+    }, 2000);
     return () => clearInterval(interval);
   }, [gas]);
 
   return (
-    <div className="bg-[#030712] border-t border-white/5">
+    <div className="bg-[#040806] border-t border-[#10b981]/15">
       <div className="max-w-7xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-4">
         {/* Chain info */}
         <div className="flex items-center gap-3">
-          <div className="size-8 rounded-lg bg-gradient-to-br from-[#3b82f6] to-[#7c3aed] flex items-center justify-center">
-            <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2L4 6v6c0 5.5 3.8 10.7 8 12 4.2-1.3 8-6.5 8-12V6l-8-4z" />
+          <div className="size-8 rounded-xl bg-gradient-to-br from-[#10b981] to-[#059669] flex items-center justify-center shadow-[0_0_10px_rgba(16,185,129,0.3)]">
+            <svg className="w-4 h-4 text-slate-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
           </div>
           <div>
-            <div className="text-xs font-semibold text-white/90">GIWA CHAIN</div>
+            <div className="text-xs font-black text-white tracking-tight">GIWA SEPOLIA</div>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <div className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[10px] text-emerald-400 font-medium uppercase tracking-wide">Mainnet</span>
+              <div className="size-1.5 rounded-full bg-[#10b981] animate-pulse" />
+              <span className="text-[10px] text-[#34d399] font-bold uppercase tracking-wider">Testnet · 91342</span>
             </div>
           </div>
         </div>
@@ -46,17 +47,19 @@ export function BlockchainFooter() {
 
         {/* Social */}
         <div className="flex items-center gap-3">
-          <span className="text-xs text-white/40 mr-1 hidden lg:block">FOLLOW GIGLOCK</span>
+          <span className="text-[10px] font-bold text-[#10b981] tracking-widest uppercase hidden lg:block">CONNECT</span>
           {[
-            { icon: 'X', href: '#' },
-            { icon: 'Discord', href: '#' },
-            { icon: 'GitHub', href: '#' },
-            { icon: 'Telegram', href: '#' },
+            { icon: 'X', href: 'https://github.com/krisnasirait/GigLock' },
+            { icon: 'Discord', href: 'https://github.com/krisnasirait/GigLock' },
+            { icon: 'GitHub', href: 'https://github.com/krisnasirait/GigLock' },
+            { icon: 'Telegram', href: 'https://github.com/krisnasirait/GigLock' },
           ].map((s) => (
             <a
               key={s.icon}
               href={s.href}
-              className="text-white/40 hover:text-white/80 transition-colors text-xs font-medium"
+              target="_blank"
+              rel="noreferrer"
+              className="text-white/40 hover:text-[#34d399] transition-colors text-xs font-medium"
               title={s.icon}
             >
               <SocialIcon name={s.icon} />
@@ -71,8 +74,8 @@ export function BlockchainFooter() {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-[10px] text-white/40 uppercase tracking-wider mb-0.5">{label}</div>
-      <div className="text-sm font-mono font-semibold text-white/90">{value}</div>
+      <div className="text-[10px] font-bold text-[#10b981] uppercase tracking-wider mb-0.5">{label}</div>
+      <div className="text-xs font-mono font-bold text-white">{value}</div>
     </div>
   );
 }
