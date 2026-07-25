@@ -1,6 +1,6 @@
 import { defineConfig } from "hardhat/config";
 import hardhatToolboxViem from "@nomicfoundation/hardhat-toolbox-viem";
-import giglockTestShim from "./plugins/test-shim.ts";
+import giglockTestShim from "./plugins/test-shim.js";
 import * as dotenv from "dotenv";
 
 dotenv.config();
@@ -40,7 +40,6 @@ export default defineConfig({
           name: "GIWA Explorer",
           url: "https://sepolia-explorer.giwa.io",
           apiUrl: "https://sepolia-explorer.giwa.io/api",
-          apiURL: "https://sepolia-explorer.giwa.io/api",
         },
       },
     },

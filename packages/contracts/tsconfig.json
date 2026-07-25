@@ -7,7 +7,7 @@
     "rootDir": ".",
     "types": ["node", "hardhat"]
   },
-  "include": ["./hardhat.config.ts", "./ignition.config.ts", "./ignition", "./tasks", "./scripts"],
-  "exclude": ["node_modules", "artifacts", "cache", "typechain-types", "test", "plugins", "types"],
-  "exclude": ["node_modules", "artifacts", "cache", "typechain-types"]
+  "include": ["./hardhat.config.ts", "./ignition.config.ts", "./tasks", "./scripts"],
+  "exclude": ["node_modules", "artifacts", "cache", "typechain-types", "test", "plugins", "types", "ignition"]
 }
+
