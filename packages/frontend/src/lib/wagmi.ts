@@ -20,6 +20,7 @@ export const wagmiConfig = getDefaultConfig({
 export const publicClient = createPublicClient({
   chain: activeChain,
   transport: http(rpcUrl),
+  batch: { multicall: false },
 });
 
 export const ACTIVE_CHAIN_ID = chainId;
