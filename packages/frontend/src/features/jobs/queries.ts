@@ -10,7 +10,6 @@ import { fetchJobMetadata } from "./ipfs.js";
 import type { JobMetadataV1, MilestoneTuple } from "./model.js";
 
 const jobsKeyPrefix = ["jobs", ACTIVE_CHAIN_ID] as const;
-const JOB_EVENT_ADDRESS_BATCH_SIZE = 100;
 
 export const jobsKeys = {
   all: jobsKeyPrefix,
@@ -43,59 +42,64 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Job metadata is unavailable.";
 }
 
-function addressBatches(addresses: Address[]): Address[][] {
-  const batches: Address[][] = [];
-  for (let index = 0; index < addresses.length; index += JOB_EVENT_ADDRESS_BATCH_SIZE) {
-    batches.push(addresses.slice(index, index + JOB_EVENT_ADDRESS_BATCH_SIZE));
-  }
-  return batches;
+/** Read a single contract view via eth_call (no multicall3 needed). */
+function readOne<T>(
+  address: Address,
+  abi: typeof EscrowJobAbi | typeof JobFactoryAbi,
+  functionName: string,
+  args?: readonly unknown[],
+): Promise<T> {
+  return publicClient.readContract({
+    address,
+    abi: abi as never,
+    functionName,
+    args,
+  }) as Promise<T>;
 }
 
 async function loadSnapshots(addresses: Address[]): Promise<JobChainSnapshot[]> {
   if (addresses.length === 0) return [];
 
-  const baseReads = addresses.flatMap((address) => [
-    { address, abi: EscrowJobAbi, functionName: "status" } as const,
-    { address, abi: EscrowJobAbi, functionName: "client" } as const,
-    { address, abi: EscrowJobAbi, functionName: "worker" } as const,
-    { address, abi: EscrowJobAbi, functionName: "totalAmount" } as const,
-    { address, abi: EscrowJobAbi, functionName: "metadataCid" } as const,
-    { address, abi: EscrowJobAbi, functionName: "milestoneCount" } as const,
-  ]);
-  const baseResults = await publicClient.multicall({ contracts: baseReads, allowFailure: false });
+  // Fetch all base fields in parallel using individual eth_call (no multicall3).
+  const baseResults = await Promise.all(
+    addresses.map(async (address) => {
+      const [status, client, worker, totalAmount, metadataCid, milestoneCount] =
+        await Promise.all([
+          readOne<bigint>(address, EscrowJobAbi, "status"),
+          readOne<Address>(address, EscrowJobAbi, "client"),
+          readOne<Address>(address, EscrowJobAbi, "worker"),
+          readOne<bigint>(address, EscrowJobAbi, "totalAmount"),
+          readOne<string>(address, EscrowJobAbi, "metadataCid"),
+          readOne<bigint>(address, EscrowJobAbi, "milestoneCount"),
+        ]);
+      return {
+        address,
+        status: Number(status),
+        client,
+        worker,
+        totalAmount,
+        metadataCid,
+        milestoneCount: Number(milestoneCount),
+      };
+    }),
+  );
 
-  const onChain = addresses.map((address, index) => {
-    const offset = index * 6;
-    return {
-      address,
-      status: Number(baseResults[offset]),
-      client: baseResults[offset + 1] as Address,
-      worker: baseResults[offset + 2] as Address,
-      totalAmount: baseResults[offset + 3] as bigint,
-      metadataCid: baseResults[offset + 4] as string,
-      milestoneCount: Number(baseResults[offset + 5]),
-    };
-  });
-  const milestoneReads = onChain.flatMap(({ address, milestoneCount }) =>
-    Array.from(
-      { length: milestoneCount },
-      (_, milestoneId) =>
-        ({
-          address,
-          abi: EscrowJobAbi,
-          functionName: "milestones",
-          args: [BigInt(milestoneId)],
-        }) as const,
+  // Fetch milestones per job in parallel.
+  const milestoneResults = await Promise.all(
+    baseResults.map(({ address, milestoneCount }) =>
+      Promise.all(
+        Array.from({ length: milestoneCount }, (_, milestoneId) =>
+          readOne<MilestoneTuple>(address, EscrowJobAbi, "milestones", [
+            BigInt(milestoneId),
+          ]),
+        ),
+      ),
     ),
   );
-  const milestoneResults =
-    milestoneReads.length === 0
-      ? []
-      : await publicClient.multicall({ contracts: milestoneReads, allowFailure: false });
 
-  let milestoneOffset = 0;
+  // Fetch IPFS metadata in parallel.
   const metadataResults = await Promise.all(
-    onChain.map(async ({ metadataCid }) => {
+    baseResults.map(async ({ metadataCid }) => {
       try {
         return { metadata: await fetchJobMetadata(metadataCid) };
       } catch (error) {
@@ -104,38 +108,24 @@ async function loadSnapshots(addresses: Address[]): Promise<JobChainSnapshot[]> 
     }),
   );
 
-  return onChain.map((job, index) => {
-    const milestones = milestoneResults.slice(
-      milestoneOffset,
-      milestoneOffset + job.milestoneCount,
-    ) as MilestoneTuple[];
-    milestoneOffset += job.milestoneCount;
-    return { ...job, milestones, ...metadataResults[index] };
-  });
+  return baseResults.map((job, index) => ({
+    ...job,
+    milestones: milestoneResults[index] ?? [],
+    ...metadataResults[index],
+  }));
 }
 
 async function loadFactoryJobAddresses(): Promise<Address[]> {
   const factory = configuredFactory();
-  const total = await publicClient.readContract({
-    address: factory,
-    abi: JobFactoryAbi,
-    functionName: "totalJobs",
-  });
+  const total = await readOne<bigint>(factory, JobFactoryAbi, "totalJobs");
   if (total === 0n) return [];
 
-  return (await publicClient.multicall({
-    contracts: Array.from(
-      { length: Number(total) },
-      (_, index) =>
-        ({
-          address: factory,
-          abi: JobFactoryAbi,
-          functionName: "allJobs",
-          args: [BigInt(index)],
-        }) as const,
+  // Fetch each job address individually (no multicall3 needed).
+  return Promise.all(
+    Array.from({ length: Number(total) }, (_, index) =>
+      readOne<Address>(factory, JobFactoryAbi, "allJobs", [BigInt(index)]),
     ),
-    allowFailure: false,
-  })) as Address[];
+  );
 }
 
 export async function loadAllJobs(): Promise<JobChainSnapshot[]> {
@@ -156,11 +146,11 @@ export async function loadWorkerJobs(account: Address): Promise<JobChainSnapshot
 
   const acceptedJobs = (
     await Promise.all(
-      addressBatches(factoryJobs).flatMap((address) =>
+      factoryJobs.flatMap((address) =>
         blockRanges(GIWA_DEPLOYMENT_BLOCK, latestBlock, GIWA_LOG_CHUNK_SIZE).map(
           ([fromBlock, toBlock]) =>
             publicClient.getContractEvents({
-              address,
+              address: [address],
               abi: EscrowJobAbi,
               eventName: "JobAccepted",
               args: { worker: account },

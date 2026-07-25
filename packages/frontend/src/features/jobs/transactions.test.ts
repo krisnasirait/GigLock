@@ -217,11 +217,18 @@ describe("job transaction workflows", () => {
   });
 
   it("hydrates only factory-authorized worker events", async () => {
-    chain.readContract.mockResolvedValue(1n);
+    // readContract is called for: totalJobs (1n), allJobs[0] (job address),
+    // then per-job: status, client, worker, totalAmount, metadataCid, milestoneCount
+    chain.readContract
+      .mockResolvedValueOnce(1n)          // totalJobs → 1 job
+      .mockResolvedValueOnce(job)         // allJobs[0] → job address
+      .mockResolvedValueOnce(2n)          // status
+      .mockResolvedValueOnce(factory)     // client
+      .mockResolvedValueOnce(account)     // worker
+      .mockResolvedValueOnce(5n)          // totalAmount
+      .mockResolvedValueOnce("not-a-valid-cid") // metadataCid
+      .mockResolvedValueOnce(0n);         // milestoneCount
     chain.getBlockNumber.mockResolvedValue(31_555_952n);
-    chain.multicall
-      .mockResolvedValueOnce([job])
-      .mockResolvedValueOnce([2, factory, account, 5n, "not-a-valid-cid", 0n]);
     chain.getContractEvents.mockResolvedValue([{ address: job }, { address: otherFactory }]);
 
     await expect(loadWorkerJobs(account)).resolves.toMatchObject([
@@ -237,16 +244,13 @@ describe("job transaction workflows", () => {
       fromBlock: 31_554_719n,
       toBlock: 31_555_952n,
     });
-    expect(chain.multicall).toHaveBeenLastCalledWith({
-      contracts: [
-        { address: job, abi: EscrowJobAbi, functionName: "status" },
-        { address: job, abi: EscrowJobAbi, functionName: "client" },
-        { address: job, abi: EscrowJobAbi, functionName: "worker" },
-        { address: job, abi: EscrowJobAbi, functionName: "totalAmount" },
-        { address: job, abi: EscrowJobAbi, functionName: "metadataCid" },
-        { address: job, abi: EscrowJobAbi, functionName: "milestoneCount" },
-      ],
-      allowFailure: false,
-    });
+    // Verify we used individual readContract calls, NOT multicall
+    expect(chain.multicall).not.toHaveBeenCalled();
+    expect(chain.readContract).toHaveBeenCalledWith(
+      expect.objectContaining({ functionName: "status", address: job }),
+    );
+    expect(chain.readContract).toHaveBeenCalledWith(
+      expect.objectContaining({ functionName: "worker", address: job }),
+    );
   });
 });

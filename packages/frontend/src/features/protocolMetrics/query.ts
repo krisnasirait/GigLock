@@ -16,7 +16,6 @@ import {
   aggregateProtocolMetrics,
   assertMetricsAddresses,
   blockRanges,
-  chunkItems,
   GIWA_DEPLOYMENT_BLOCK,
   GIWA_LOG_CHUNK_SIZE,
   type JobSnapshot,
@@ -24,13 +23,8 @@ import {
   type ProtocolMetrics,
 } from "./model.js";
 
-const ADDRESS_BATCH_SIZE = 100;
 const METRICS_STALE_TIME = 30_000;
 const METRICS_REFRESH_INTERVAL = 60_000;
-
-function addressBatches(addresses: Address[]): Address[][] {
-  return chunkItems(addresses, ADDRESS_BATCH_SIZE);
-}
 
 function requiredLogFields(log: Log): {
   blockNumber: bigint;
@@ -69,15 +63,13 @@ async function loadEscrowLogs(addresses: Address[], latestBlock: bigint) {
   if (addresses.length === 0) return [];
 
   const pages = await Promise.all(
-    addressBatches(addresses).flatMap((addressBatch) =>
-      blockRanges(GIWA_DEPLOYMENT_BLOCK, latestBlock, GIWA_LOG_CHUNK_SIZE).map(
-        ([fromBlock, toBlock]) =>
-          publicClient.getLogs({
-            address: addressBatch,
-            fromBlock,
-            toBlock,
-          }),
-      ),
+    blockRanges(GIWA_DEPLOYMENT_BLOCK, latestBlock, GIWA_LOG_CHUNK_SIZE).map(
+      ([fromBlock, toBlock]) =>
+        publicClient.getLogs({
+          address: addresses,
+          fromBlock,
+          toBlock,
+        }),
     ),
   );
   return pages.flat();
@@ -89,36 +81,30 @@ async function loadJobs(
 ): Promise<JobSnapshot[]> {
   if (addresses.length === 0) return [];
 
-  const snapshots = await Promise.all(
-    addressBatches(addresses).map(async (addressBatch) => {
-      const contracts = addressBatch.flatMap((address) => [
-        {
+  return Promise.all(
+    addresses.map(async (address) => {
+      const [status, balance] = await Promise.all([
+        publicClient.readContract({
           address,
           abi: EscrowJobAbi,
           functionName: "status",
-        } as const,
-        {
+        }) as Promise<unknown> as Promise<bigint>,
+        publicClient.readContract({
           address: mockUsdc,
           abi: MockUSDCAbi,
           functionName: "balanceOf",
           args: [address],
-        } as const,
+        }) as Promise<bigint>,
       ]);
-      const results = await publicClient.multicall({
-        contracts,
-        allowFailure: false,
-      });
-
-      return addressBatch.map((address, index) => ({
+      return {
         address,
-        status: Number(results[index * 2]),
-        balance: results[index * 2 + 1] as bigint,
-      }));
+        status: Number(status),
+        balance,
+      };
     }),
   );
-
-  return snapshots.flat();
 }
+
 
 async function loadBlockTimestamps(blockNumbers: bigint[]) {
   const entries = await Promise.all(
@@ -210,7 +196,7 @@ export async function loadProtocolMetrics(): Promise<ProtocolMetrics> {
   const events = [
     ...jobCreatedEvents,
     ...escrowLogs
-      .map((log) => normalizeEscrowEvent(log, timestamps))
+      .map((log: Parameters<typeof normalizeEscrowEvent>[0]) => normalizeEscrowEvent(log, timestamps))
       .filter((event): event is ProtocolEvent => event !== null),
   ];
 
