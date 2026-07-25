@@ -35,7 +35,7 @@ const GUIDES = [
     id: 'worker',
     title: 'Worker Guide: Accept & Get Paid',
     badge: 'Beginner',
-    badgeColor: '#10b981',
+    badgeColor: '#34d399',
     time: '5 min',
     sections: [
       {
@@ -64,7 +64,7 @@ const GUIDES = [
     id: 'integrate',
     title: 'Integration: Add GigLock to Your App',
     badge: 'Advanced',
-    badgeColor: '#f59e0b',
+    badgeColor: '#059669',
     time: '20 min',
     sections: [
       {
@@ -137,57 +137,57 @@ export function DocsPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   return (
-    <div className="min-h-screen pt-24 pb-16">
+    <div className="min-h-screen pt-28 pb-16 bg-[#050b08]">
       {/* Hero */}
       <section className="max-w-5xl mx-auto px-6 mb-20 text-center">
-        <div className="inline-flex items-center gap-2 border border-[#22d3ee]/30 bg-[#22d3ee]/5 rounded-full px-4 py-1.5 mb-6">
-          <div className="size-1.5 rounded-full bg-[#22d3ee] animate-pulse" />
-          <span className="text-xs font-semibold text-[#22d3ee] uppercase tracking-widest">Documentation</span>
+        <div className="inline-flex items-center gap-2 border border-[#10b981]/30 bg-[#10b981]/10 rounded-full px-4 py-1.5 mb-6">
+          <div className="size-2 rounded-full bg-[#10b981] animate-pulse" />
+          <span className="text-xs font-bold text-[#34d399] uppercase tracking-widest">Documentation</span>
         </div>
-        <h1 className="text-5xl font-black text-white mb-4">GigLock Docs</h1>
-        <p className="text-lg text-white/50 max-w-2xl mx-auto">
+        <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight mb-4">GigLock Docs</h1>
+        <p className="text-base sm:text-lg text-white/50 max-w-2xl mx-auto leading-relaxed">
           Step-by-step guides for clients, workers, and developers integrating the GigLock protocol.
         </p>
       </section>
 
       {/* Guides */}
       <section className="max-w-5xl mx-auto px-6 mb-20">
-        <h2 className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-6">Guides</h2>
+        <h2 className="text-xs font-bold text-[#10b981] uppercase tracking-widest mb-6">Guides</h2>
         <div className="flex gap-6 flex-col md:flex-row">
           {/* Sidebar */}
-          <div className="md:w-56 shrink-0 space-y-1.5">
+          <div className="md:w-60 shrink-0 space-y-2">
             {GUIDES.map((g, i) => (
               <button
                 key={g.id}
                 onClick={() => setActiveGuide(i)}
-                className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all ${
+                className={`w-full text-left px-4 py-3.5 rounded-2xl text-sm transition-all border ${
                   activeGuide === i
-                    ? 'bg-white/5 text-white border border-white/10'
-                    : 'text-white/40 hover:text-white/70 hover:bg-white/[0.02]'
+                    ? 'bg-[#10b981]/15 text-white border-[#10b981]/35 shadow-lg shadow-[#10b981]/5'
+                    : 'bg-[#09140e] border-[#10b981]/10 text-white/50 hover:text-white hover:border-[#10b981]/25'
                 }`}
               >
-                <div className="font-semibold leading-tight mb-1">{g.title}</div>
+                <div className="font-bold leading-tight mb-1">{g.title}</div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
-                        style={{ background: `${g.badgeColor}15`, color: g.badgeColor }}>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                        style={{ background: `${g.badgeColor}20`, color: g.badgeColor, border: `1px solid ${g.badgeColor}30` }}>
                     {g.badge}
                   </span>
-                  <span className="text-[10px] text-white/25">{g.time}</span>
+                  <span className="text-[10px] text-white/30 font-medium">{g.time}</span>
                 </div>
               </button>
             ))}
           </div>
 
           {/* Content */}
-          <div className="flex-1 rounded-2xl border border-white/5 bg-[#0a0e22]/60 p-6">
+          <div className="flex-1 rounded-3xl border border-[#10b981]/20 bg-[#09140e] p-7">
             <h3 className="text-xl font-bold text-white mb-6">{GUIDES[activeGuide]?.title}</h3>
             <div className="space-y-6">
               {(GUIDES[activeGuide]?.sections ?? []).map((s) => (
                 <div key={s.heading}>
-                  <h4 className="font-semibold text-white mb-2">{s.heading}</h4>
+                  <h4 className="font-bold text-white text-base mb-2">{s.heading}</h4>
                   <p className="text-sm text-white/50 leading-relaxed mb-3">{s.body}</p>
                   {s.code && (
-                    <pre className="rounded-xl bg-[#070c1e] border border-white/5 p-4 text-xs text-[#22d3ee] overflow-x-auto">
+                    <pre className="rounded-2xl bg-[#07110c] border border-[#10b981]/20 p-4 text-xs text-[#34d399] font-mono overflow-x-auto">
                       <code>{s.code}</code>
                     </pre>
                   )}
@@ -200,24 +200,21 @@ export function DocsPage() {
 
       {/* FAQ */}
       <section className="max-w-5xl mx-auto px-6 mb-20">
-        <h2 className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-6">FAQ</h2>
-        <div className="space-y-2">
+        <h2 className="text-xs font-bold text-[#10b981] uppercase tracking-widest mb-6">FAQ</h2>
+        <div className="space-y-3">
           {FAQ.map((f, i) => (
-            <div key={i} className="rounded-xl border border-white/5 bg-[#0a0e22]/60 overflow-hidden">
+            <div key={i} className="rounded-2xl border border-[#10b981]/15 bg-[#09140e] overflow-hidden">
               <button
                 onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-white/[0.02] transition-all"
+                className="w-full flex items-center justify-between px-6 py-4.5 text-left hover:bg-[#10b981]/5 transition-colors"
               >
-                <span className="font-semibold text-white text-sm">{f.q}</span>
-                <svg
-                  className={`w-4 h-4 text-white/40 shrink-0 transition-transform ${openFaq === i ? 'rotate-180' : ''}`}
-                  viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                >
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
+                <span className="font-bold text-white text-sm sm:text-base">{f.q}</span>
+                <span className="text-lg font-bold text-[#10b981] ml-4">
+                  {openFaq === i ? '−' : '+'}
+                </span>
               </button>
               {openFaq === i && (
-                <div className="px-5 pb-4 text-sm text-white/45 leading-relaxed border-t border-white/5 pt-3">
+                <div className="px-6 pb-5 text-sm text-white/50 leading-relaxed border-t border-[#10b981]/10 pt-3">
                   {f.a}
                 </div>
               )}
@@ -229,20 +226,20 @@ export function DocsPage() {
       {/* Quick links */}
       <section className="max-w-5xl mx-auto px-6">
         <div className="grid md:grid-cols-3 gap-4">
-          <Link to="/protocol" className="group rounded-xl border border-white/5 bg-[#0a0e22]/60 p-5 hover:border-[#3b82f6]/30 transition-all">
-            <div className="text-2xl mb-3">⚙️</div>
-            <div className="font-semibold text-white text-sm mb-1 group-hover:text-[#3b82f6] transition-colors">Protocol →</div>
-            <p className="text-xs text-white/40">Contract mechanics and security model</p>
+          <Link to="/protocol" className="group rounded-2xl border border-[#10b981]/15 bg-[#09140e] p-6 hover:border-[#10b981]/35 transition-all">
+            <div className="text-3xl mb-3">⚙️</div>
+            <div className="font-bold text-white text-base mb-1 group-hover:text-[#34d399] transition-colors">Protocol →</div>
+            <p className="text-xs text-white/40 leading-relaxed">Contract mechanics and security model</p>
           </Link>
-          <Link to="/developers" className="group rounded-xl border border-white/5 bg-[#0a0e22]/60 p-5 hover:border-[#f59e0b]/30 transition-all">
-            <div className="text-2xl mb-3">🛠️</div>
-            <div className="font-semibold text-white text-sm mb-1 group-hover:text-[#f59e0b] transition-colors">Developers →</div>
-            <p className="text-xs text-white/40">ABIs, relayer API, and code examples</p>
+          <Link to="/developers" className="group rounded-2xl border border-[#10b981]/15 bg-[#09140e] p-6 hover:border-[#10b981]/35 transition-all">
+            <div className="text-3xl mb-3">🛠️</div>
+            <div className="font-bold text-white text-base mb-1 group-hover:text-[#34d399] transition-colors">Developers →</div>
+            <p className="text-xs text-white/40 leading-relaxed">ABIs, relayer API, and code examples</p>
           </Link>
-          <Link to="/giwa-id" className="group rounded-xl border border-white/5 bg-[#0a0e22]/60 p-5 hover:border-[#8b5cf6]/30 transition-all">
-            <div className="text-2xl mb-3">🪪</div>
-            <div className="font-semibold text-white text-sm mb-1 group-hover:text-[#8b5cf6] transition-colors">GIWA ID →</div>
-            <p className="text-xs text-white/40">Soulbound identity and reputation score</p>
+          <Link to="/giwa-id" className="group rounded-2xl border border-[#10b981]/15 bg-[#09140e] p-6 hover:border-[#10b981]/35 transition-all">
+            <div className="text-3xl mb-3">🪪</div>
+            <div className="font-bold text-white text-base mb-1 group-hover:text-[#34d399] transition-colors">GIWA ID →</div>
+            <p className="text-xs text-white/40 leading-relaxed">Soulbound identity and reputation score</p>
           </Link>
         </div>
       </section>
