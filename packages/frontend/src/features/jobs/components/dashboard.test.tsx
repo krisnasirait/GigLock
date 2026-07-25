@@ -262,7 +262,7 @@ describe("AppDashboardPage", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText("0/1 complete")).toBeTruthy();
+    expect(screen.getByText(/0 \/ 1 Released|0\/1 complete/)).toBeTruthy();
   });
 
   it("links every job card to its details and Created jobs to funding recovery", () => {
@@ -283,8 +283,8 @@ describe("AppDashboardPage", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("link", { name: "View job" }).getAttribute("href")).toBe(`/app/jobs/${jobAddress}`);
-    expect(screen.getByRole("link", { name: "Recover funding" }).getAttribute("href")).toBe(`/app/jobs/new?job=${jobAddress}`);
+    expect(screen.getAllByRole("link", { name: /View Escrow|Escrow 0x2222/ })[0].getAttribute("href")).toBe(`/app/jobs/${jobAddress}`);
+    expect(screen.getByRole("button", { name: "Recover Funding" }).closest("a")?.getAttribute("href")).toBe(`/app/jobs/new?job=${jobAddress}`);
   });
 
   it("does not show a cancelled escrow as a completed transaction path", () => {

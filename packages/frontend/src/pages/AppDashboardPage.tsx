@@ -53,11 +53,11 @@ function JobList({
   error: unknown;
   empty: string;
 }) {
-  if (isLoading) return <p className="dashboard-feedback" role="status">Loading on-chain jobs…</p>;
-  if (error) return <p className="dashboard-feedback dashboard-feedback-error" role="alert">{errorMessage(error)} Refresh to try the chain read again.</p>;
-  if (jobs.length === 0) return <p className="dashboard-feedback">{empty}</p>;
+  if (isLoading) return <div className="p-12 text-center text-[#34d399] font-medium" role="status">Loading on-chain jobs…</div>;
+  if (error) return <div className="p-12 text-center text-red-400 font-medium" role="alert">{errorMessage(error)} Refresh to try the chain read again.</div>;
+  if (jobs.length === 0) return <div className="p-12 text-center text-white/50 border border-[#10b981]/15 rounded-3xl bg-[#08130d] my-4">{empty}</div>;
 
-  return <div className="job-list">{jobs.map((job) => <JobCard key={job.address} job={job} />)}</div>;
+  return <div className="space-y-6 my-6">{jobs.map((job) => <JobCard key={job.address} job={job} />)}</div>;
 }
 
 function nextClaimDetail(eligibility: { eligible: boolean; eligibleAt: bigint } | undefined): ReactNode {
@@ -200,51 +200,58 @@ export function AppDashboardPage() {
 
   return (
     <div className="dashboard-page">
-      <header className="dashboard-header">
+      {/* Page Header */}
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 pb-6 border-b border-[#10b981]/15">
         <div>
-          <p className="dashboard-overline">Testnet escrow workspace</p>
-          <h1>Jobs in motion</h1>
-          <p>Track funded work, wallet balances, and the on-chain escrow path from one place.</p>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="size-2 rounded-full bg-[#10b981] animate-pulse" />
+            <span className="text-[10px] font-bold text-[#10b981] tracking-widest uppercase">
+              GIWA Sepolia · Chain 91342
+            </span>
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Escrow Job Board</h1>
+          <p className="text-xs sm:text-sm text-white/50 mt-1 max-w-xl">
+            Browse open jobs, review deliverables, and manage non-custodial milestone escrows on GIWA Sepolia.
+          </p>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <p className="dashboard-network"><span aria-hidden="true" /> GIWA Sepolia · Chain 91342</p>
-          {canWrite && (
-            <Link to="/app/jobs/new">
-              <button className="btn-primary text-sm flex items-center gap-2" id="post-job-btn">
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-                Post a Job
-              </button>
-            </Link>
-          )}
-        </div>
+        {canWrite && (
+          <Link to="/app/jobs/new">
+            <button className="btn-primary text-sm px-6 py-3 flex items-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.35)] shrink-0" id="post-job-btn">
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              <span>Post a Job</span>
+            </button>
+          </Link>
+        )}
       </header>
 
       <WalletGate />
 
-      <section className="balance-summary" aria-label="Wallet balances">
+      {/* Compact Utility Bar (Balances & Faucet) */}
+      <div className="grid md:grid-cols-2 gap-4 my-6">
         <BalanceCard
-          label="MockUSDC"
+          label="MockUSDC Balance & Faucet"
           value={formatBalance(usdcBalanceQuery.data, 6, "USDC")}
-          detail={address ? nextClaimDetail(faucetEligibilityQuery.data) : "Connect a wallet to read your balance"}
+          detail={address ? nextClaimDetail(faucetEligibilityQuery.data) : "Connect wallet to read balance"}
           isLoading={usdcBalanceQuery.isLoading}
           error={usdcBalanceQuery.isError
-            ? "USDC balance is unavailable."
+            ? "USDC balance unavailable."
             : faucetEligibilityQuery.isError
-              ? "Faucet availability is unavailable. Try refreshing the page."
+              ? "Faucet unavailable."
               : undefined}
           action={canWrite ? { label: claimLabel, onClick: claimFaucet, disabled: claimDisabled } : undefined}
         />
         <BalanceCard
-          label="GIWA ETH"
+          label="GIWA ETH Gas Fee"
           value={formatBalance(ethBalanceQuery.data, 18, "ETH")}
-          detail={address ? "Used to pay testnet gas" : "Connect a wallet to read your balance"}
+          detail={address ? "Used for testnet transaction gas fees" : "Connect wallet to read balance"}
           isLoading={ethBalanceQuery.isLoading}
-          error={ethBalanceQuery.isError ? "GIWA ETH balance is unavailable." : undefined}
+          error={ethBalanceQuery.isError ? "GIWA ETH balance unavailable." : undefined}
         />
-      </section>
+      </div>
 
+      {/* Claim Feedback Banner */}
       <div className="claim-feedback" aria-live="polite">
         {claimState.phase === "wallet" ? "Confirm the claim in your wallet." : null}
         {claimState.phase === "confirming" ? "Claim submitted. Waiting for the GIWA receipt…" : null}
@@ -252,49 +259,45 @@ export function AppDashboardPage() {
         {claimState.phase === "error" ? claimError : null}
         {claimState.hash ? (
           <a href={faucetTransactionUrl(claimState.hash)} target="_blank" rel="noreferrer" aria-label="View claim on GIWA Explorer">
-            View claim on GIWA Explorer
+            View claim on GIWA Explorer ↗
           </a>
         ) : null}
       </div>
 
-      <section className="dashboard-jobs" aria-labelledby="job-list-heading">
-        <div className="dashboard-jobs-heading">
+      {/* Main Hero Section: Job Board */}
+      <section className="mt-8" aria-labelledby="job-list-heading">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#10b981]/15">
           <div>
-            <h2 id="job-list-heading">Job board</h2>
-            <p>Listings read directly from GIWA Sepolia, even before a wallet is connected.</p>
+            <h2 id="job-list-heading" className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              On-Chain Escrows
+            </h2>
+            <p className="text-xs text-white/50">
+              Read directly from GIWA Sepolia smart contracts.
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <div className="dashboard-tabs" role="tablist" aria-label="Job lists">
-            {dashboardTabs.map(({ value, label }, index) => (
-              <button
-                aria-controls={`${value}-panel`}
-                aria-selected={tab === value}
-                className={tab === value ? "dashboard-tab is-active" : "dashboard-tab"}
-                id={`${value}-tab`}
-                key={value}
-                onClick={() => setTab(value)}
-                onKeyDown={(event) => onTabKeyDown(event, index)}
-                ref={(element) => { tabRefs.current[index] = element; }}
-                role="tab"
-                tabIndex={tab === value ? 0 : -1}
-                type="button"
-              >
-                {label}
-              </button>
-            ))}
-            </div>
-            {canWrite && (
-              <Link to="/app/jobs/new">
-                <button className="btn-primary text-xs flex items-center gap-1.5 px-3 py-1.5" id="post-job-board-btn">
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
-                  Post a Job
+              {dashboardTabs.map(({ value, label }, index) => (
+                <button
+                  aria-controls={`${value}-panel`}
+                  aria-selected={tab === value}
+                  className={tab === value ? "dashboard-tab is-active" : "dashboard-tab"}
+                  id={`${value}-tab`}
+                  key={value}
+                  onClick={() => setTab(value)}
+                  onKeyDown={(event) => onTabKeyDown(event, index)}
+                  ref={(element) => { tabRefs.current[index] = element; }}
+                  role="tab"
+                  tabIndex={tab === value ? 0 : -1}
+                  type="button"
+                >
+                  {label}
                 </button>
-              </Link>
-            )}
+              ))}
+            </div>
           </div>
         </div>
+
         {dashboardTabs.map(({ value }) => {
           const selected = tab === value;
           const panelJobs = value === "available" ? filterAvailable(jobs) : value === "client" ? clientJobs : workerJobs;
