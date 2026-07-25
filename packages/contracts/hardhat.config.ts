@@ -1,6 +1,6 @@
 import { defineConfig } from "hardhat/config";
 import hardhatToolboxViem from "@nomicfoundation/hardhat-toolbox-viem";
-import giglockTestShim from "./plugins/test-shim.js";
+import giglockTestShim from "./plugins/test-shim.ts";
 import * as dotenv from "dotenv";
 
 dotenv.config();
@@ -16,7 +16,7 @@ export default defineConfig({
     version: "0.8.24",
     settings: {
       optimizer: { enabled: true, runs: 200 },
-      viaIR: true,
+      evmVersion: "shanghai",
     },
   },
   networks: {
@@ -32,8 +32,17 @@ export default defineConfig({
       accounts: [DEPLOYER_PRIVATE_KEY],
     },
   },
-  // Block explorer verification (Blockscout-compatible) is wired in a
-  // follow-up plan via @nomicfoundation/hardhat-verify. The default HH3
-  // config shape does not expose a top-level blockExplorers field, so
-  // we defer the explorer wiring until verification is actually used.
+  chainDescriptors: {
+    91342: {
+      name: "GIWA Sepolia",
+      blockExplorers: {
+        blockscout: {
+          name: "GIWA Explorer",
+          url: "https://sepolia-explorer.giwa.io",
+          apiUrl: "https://sepolia-explorer.giwa.io/api",
+          apiURL: "https://sepolia-explorer.giwa.io/api",
+        },
+      },
+    },
+  },
 });
