@@ -246,7 +246,7 @@ export function NewJobPage() {
     if (workflowGeneration.current !== generation || accountRef.current !== account) return false;
     setStage("complete");
     setWorkflowError(undefined);
-    setProgressDetail("Funding is confirmed on GIWA Sepolia.");
+    setProgressDetail("Funding receipt confirmed. The escrow is available on-chain.");
     await invalidateJobQueries(queryClient, { jobAddress: job.address, accounts: [account] });
     return workflowGeneration.current === generation && accountRef.current === account;
   }
@@ -623,36 +623,88 @@ export function NewJobPage() {
   const actionLabel = stage === "complete" ? "Escrow funded" : pendingCreation ? "Check submitted creation" : pendingFunding ? "Check submitted funding" : retryingMetadata ? "Retry metadata upload" : confirmedJob ? "Finish funding" : "Create and fund escrow";
 
   return (
-    <div className="dashboard-page new-job-page">
-      <header className="dashboard-header">
+    <div className="dashboard-page new-job-page max-w-4xl mx-auto px-4 sm:px-6">
+      <header className="dashboard-header mb-6">
         <div>
-          <p className="dashboard-overline">Testnet escrow workspace</p>
-          <h1>Post a job</h1>
-          <p>Describe the work, pin its brief to IPFS, then create and fund a GIWA Sepolia escrow.</p>
+          <p className="dashboard-overline text-xs font-bold text-cyan-400 uppercase tracking-widest">Testnet escrow workspace</p>
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mt-1">Post a job</h1>
+          <p className="text-sm sm:text-base text-white/60 mt-2 max-w-2xl">Describe the work, pin its brief to IPFS, then create and fund a GIWA Sepolia escrow.</p>
         </div>
-        <p className="dashboard-network"><span aria-hidden="true" /> GIWA Sepolia · Chain 91342</p>
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-cyan-950/60 border border-cyan-500/30 text-cyan-300 text-xs font-semibold shrink-0">
+          <span className="size-2 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.8)]" aria-hidden="true" />
+          GIWA Sepolia · Chain 91342
+        </div>
       </header>
 
       <WalletGate />
 
-      <form ref={formRef} className="new-job-form mt-4 grid gap-4" onSubmit={(event) => { event.preventDefault(); void runWorkflow(); }} noValidate>
-        <section className="new-job-card card-glass rounded-xl p-5 sm:p-6" aria-labelledby="job-details-heading">
-          <div className="new-job-section-heading">
-            <div><p className="dashboard-overline">Job brief</p><h2 id="job-details-heading">Make the agreement clear</h2></div>
-            <p className="new-job-limit">All fields are stored in IPFS metadata.</p>
+      <form ref={formRef} className="new-job-form mt-6 space-y-6" onSubmit={(event) => { event.preventDefault(); void runWorkflow(); }} noValidate>
+        {/* Job Brief Card */}
+        <section className="card-glass border border-white/10 rounded-2xl p-6 sm:p-7 shadow-xl shadow-black/40 space-y-6" aria-labelledby="job-details-heading">
+          <div className="border-b border-white/10 pb-5">
+            <p className="dashboard-overline text-xs font-bold text-cyan-400 uppercase tracking-widest">Job brief</p>
+            <h2 id="job-details-heading" className="text-xl font-extrabold text-white tracking-tight mt-1">Make the agreement clear</h2>
+            <p className="text-xs text-white/50 mt-1">All fields are stored in IPFS metadata.</p>
           </div>
-          <label htmlFor="job-title">Job title</label>
-          <input className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-cyan-300" id="job-title" value={draft.title} maxLength={100} disabled={draftLocked} aria-invalid={errors.title ? true : undefined} aria-describedby={errors.title ? "job-title-error" : undefined} onChange={(event) => updateDraft("title", event.target.value)} />
-          {errors.title ? <p id="job-title-error" className="new-job-error">{errors.title}</p> : null}
-          <label htmlFor="job-description">Job description</label>
-          <textarea className="mt-1 min-h-32 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-cyan-300" id="job-description" value={draft.description} maxLength={4000} disabled={draftLocked} aria-invalid={errors.description ? true : undefined} aria-describedby={errors.description ? "job-description-error" : undefined} onChange={(event) => updateDraft("description", event.target.value)} />
-          {errors.description ? <p id="job-description-error" className="new-job-error">{errors.description}</p> : null}
-          <label htmlFor="job-skills">Skills</label>
-          <input className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-cyan-300" id="job-skills" value={draft.skills} disabled={draftLocked} aria-invalid={errors.skills ? true : undefined} aria-describedby={errors.skills ? "job-skills-error job-skills-help" : "job-skills-help"} onChange={(event) => updateDraft("skills", event.target.value)} />
-          <p id="job-skills-help" className="new-job-helper">Separate up to 10 skills with commas. Each skill can be 1–32 characters.</p>
-          {errors.skills ? <p id="job-skills-error" className="new-job-error">{errors.skills}</p> : null}
+
+          <div className="space-y-5">
+            <div>
+              <label htmlFor="job-title" className="block text-xs font-semibold text-white/70 uppercase tracking-wider mb-1.5">
+                Job title
+              </label>
+              <input
+                className="w-full rounded-xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white placeholder-white/20 outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50 transition-all"
+                id="job-title"
+                value={draft.title}
+                maxLength={100}
+                placeholder="e.g. ERC-721 Smart Contract and Minting DApp"
+                disabled={draftLocked}
+                aria-invalid={errors.title ? true : undefined}
+                aria-describedby={errors.title ? "job-title-error" : undefined}
+                onChange={(event) => updateDraft("title", event.target.value)}
+              />
+              {errors.title && <p id="job-title-error" className="text-xs text-rose-400 mt-1.5 font-medium">{errors.title}</p>}
+            </div>
+
+            <div>
+              <label htmlFor="job-description" className="block text-xs font-semibold text-white/70 uppercase tracking-wider mb-1.5">
+                Job description
+              </label>
+              <textarea
+                className="min-h-36 w-full rounded-xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white placeholder-white/20 outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50 transition-all leading-relaxed"
+                id="job-description"
+                value={draft.description}
+                maxLength={4000}
+                placeholder="I need an experienced Web3 developer to write, test, and deploy an ERC-721A smart contract..."
+                disabled={draftLocked}
+                aria-invalid={errors.description ? true : undefined}
+                aria-describedby={errors.description ? "job-description-error" : undefined}
+                onChange={(event) => updateDraft("description", event.target.value)}
+              />
+              {errors.description && <p id="job-description-error" className="text-xs text-rose-400 mt-1.5 font-medium">{errors.description}</p>}
+            </div>
+
+            <div>
+              <label htmlFor="job-skills" className="block text-xs font-semibold text-white/70 uppercase tracking-wider mb-1.5">
+                Skills
+              </label>
+              <input
+                className="w-full rounded-xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white placeholder-white/20 outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50 transition-all"
+                id="job-skills"
+                value={draft.skills}
+                placeholder="Solidity, React, Ethers.js, ERC-721, Hardhat"
+                disabled={draftLocked}
+                aria-invalid={errors.skills ? true : undefined}
+                aria-describedby={errors.skills ? "job-skills-error job-skills-help" : "job-skills-help"}
+                onChange={(event) => updateDraft("skills", event.target.value)}
+              />
+              <p id="job-skills-help" className="text-xs text-white/40 mt-1.5">Separate up to 10 skills with commas. Each skill can be 1–32 characters.</p>
+              {errors.skills && <p id="job-skills-error" className="text-xs text-rose-400 mt-1.5 font-medium">{errors.skills}</p>}
+            </div>
+          </div>
         </section>
 
+        {/* Milestone Editor */}
         <MilestoneEditor
           milestones={draft.milestones}
           errors={errors}
@@ -662,22 +714,79 @@ export function NewJobPage() {
           disabled={draftLocked}
         />
 
-        <section className="new-job-submit card-glass rounded-xl p-5 sm:p-6" aria-label="Escrow funding">
-          <p className="dashboard-overline">Escrow amount</p>
-          <p className="new-job-total">Total escrow: {formatUnits(displayedTotal, 6)} USDC</p>
-          {metadataUnavailable ? <p className="new-job-helper" role="status">Metadata is unavailable from IPFS. The verified on-chain escrow amount is shown below; this job is read-only.</p> : null}
-          {errors.total || errors.form ? <p className="new-job-error" role="alert">{errors.total ?? errors.form}</p> : null}
-          <p className="new-job-helper">MockUSDC is approved for this exact total, then transferred only after the approval receipt confirms.</p>
-          {confirmedJob ? <p className="new-job-address">Escrow address: <code>{confirmedJob.address}</code></p> : null}
-          <button className="btn-primary new-job-submit-button" type="submit" disabled={!canWrite || isSubmitting || stage === "complete"}>
-            {isSubmitting ? "Confirm in wallet…" : actionLabel}
+        {/* Submit & Escrow Summary Card */}
+        <section className="card-glass border border-white/10 rounded-2xl p-6 sm:p-7 shadow-xl shadow-black/40 space-y-5" aria-label="Escrow funding">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-5">
+            <div>
+              <p className="dashboard-overline text-xs font-bold text-emerald-400 uppercase tracking-widest">Escrow amount</p>
+              <p className="text-2xl font-black text-white tracking-tight mt-1">
+                Total escrow: {formatUnits(displayedTotal, 6)} USDC
+              </p>
+            </div>
+            {confirmedJob && (
+              <div className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
+                Escrow funded
+              </div>
+            )}
+          </div>
+
+          {metadataUnavailable && (
+            <p className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl" role="status">
+              Metadata is unavailable from IPFS. The verified on-chain escrow amount is shown below; this job is read-only.
+            </p>
+          )}
+
+          {(errors.total || errors.form) && (
+            <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 p-3 rounded-xl font-medium" role="alert">
+              {errors.total ?? errors.form}
+            </p>
+          )}
+
+          <p className="text-xs text-white/50 leading-relaxed">
+            MockUSDC is approved for this exact total, then transferred only after the approval receipt confirms.
+          </p>
+
+          {confirmedJob && (
+            <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/10 flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-white/50 font-medium">Escrow address:</span>
+              <code className="text-cyan-300 font-mono select-all">{confirmedJob.address}</code>
+            </div>
+          )}
+
+          <button
+            className="btn-primary w-full py-3.5 text-sm font-bold rounded-xl shadow-lg shadow-[#3b82f6]/25 transition-all flex items-center justify-center gap-2"
+            type="submit"
+            disabled={!canWrite || isSubmitting || stage === "complete"}
+          >
+            {isSubmitting ? (
+              <>
+                <svg className="w-4 h-4 animate-spin text-white" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Confirm in wallet…
+              </>
+            ) : (
+              actionLabel
+            )}
           </button>
-          {!canWrite ? <p className="new-job-helper">Connect a wallet on GIWA Sepolia to create an escrow.</p> : null}
+
+          {!canWrite && (
+            <p className="text-xs text-center text-amber-300/80">Connect a wallet on GIWA Sepolia to create an escrow.</p>
+          )}
         </section>
       </form>
 
       <CreateJobProgress stage={stage} hashes={hashes} error={workflowError} detail={progressDetail} />
-      {stage === "complete" ? <p className="new-job-success" role="status">Escrow funded on GIWA Sepolia.</p> : null}
+
+      {stage === "complete" && (
+        <div className="mt-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-center font-bold text-sm shadow-lg shadow-emerald-500/5 flex items-center justify-center gap-2" role="status">
+          <svg className="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          Escrow funded on GIWA Sepolia.
+        </div>
+      )}
     </div>
   );
 }
