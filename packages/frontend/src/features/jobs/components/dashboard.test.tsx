@@ -283,7 +283,7 @@ describe("AppDashboardPage", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getAllByRole("link", { name: /View Escrow|Escrow 0x2222/ })[0].getAttribute("href")).toBe(`/app/jobs/${jobAddress}`);
+    expect(screen.getAllByRole("link", { name: /View Escrow|Escrow 0x2222/ })[0]!.getAttribute("href")).toBe(`/app/jobs/${jobAddress}`);
     expect(screen.getByRole("button", { name: "Recover Funding" }).closest("a")?.getAttribute("href")).toBe(`/app/jobs/new?job=${jobAddress}`);
   });
 
