@@ -243,6 +243,8 @@ export function JobDetailPage() {
   const submittedTitle = submittedMilestone >= 0 ? job.metadata?.milestones[submittedMilestone]?.title ?? `Milestone ${submittedMilestone + 1}` : "Milestone";
   const actionPending = pending !== undefined;
 
+  const otherActions = actions.filter((action) => action !== "submit-proof" && action !== "confirm");
+
   return (
     <div className="dashboard-page job-detail-page">
       <header className="dashboard-header">
@@ -273,6 +275,7 @@ export function JobDetailPage() {
       {selectedPending && actions.includes("submit-proof") ? (
         <EvidencePanel
           milestoneTitle={pendingTitle}
+          milestoneAmount={selectedPending ? `${formatUnits(selectedPending[0], 6)} USDC` : undefined}
           proofCid=""
           proofHash={selectedPending[2] as Hex}
           canSubmit
@@ -284,18 +287,27 @@ export function JobDetailPage() {
       {selectedSubmitted ? (
         <EvidencePanel
           milestoneTitle={submittedTitle}
+          milestoneAmount={selectedSubmitted ? `${formatUnits(selectedSubmitted[0], 6)} USDC` : undefined}
           proofCid={selectedSubmitted[3]}
           proofHash={selectedSubmitted[2] as Hex}
           canSubmit={false}
           pending={actionPending}
           onSubmit={async () => undefined}
+          canConfirmRelease={actions.includes("confirm")}
+          onConfirmRelease={() => void runAction("confirm", {
+            address: jobAddress,
+            abi: EscrowJobAbi,
+            functionName: "confirmMilestone",
+            args: [BigInt(submittedMilestone)],
+            chainId: 91342,
+          })}
         />
       ) : null}
 
-      {actions.filter((action) => action !== "submit-proof" && action !== "fund").length > 0 || actions.includes("fund") ? (
+      {otherActions.length > 0 || actions.includes("fund") ? (
         <section className="job-detail-action" aria-label="Available job action">
           {actions.includes("fund") ? <Link className="btn-primary" to={`/app/jobs/new?job=${jobAddress}`}>Recover funding</Link> : null}
-          {actions.filter((action) => action !== "submit-proof" && action !== "fund").map((action) => (
+          {otherActions.map((action) => (
             <button
               className="btn-primary"
               disabled={!canWrite || actionPending}
@@ -305,7 +317,7 @@ export function JobDetailPage() {
                 address: jobAddress,
                 abi: EscrowJobAbi,
                 functionName: action === "accept" ? "acceptJob" : "confirmMilestone",
-                args: action === "confirm" && submittedMilestone >= 0 ? [BigInt(submittedMilestone)] : undefined,
+                args: undefined,
                 chainId: 91342,
               })}
             >

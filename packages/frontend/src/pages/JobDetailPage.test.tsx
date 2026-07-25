@@ -141,7 +141,7 @@ describe("JobDetailPage action visibility", () => {
     renderPage();
     expect(await screen.findByLabelText("Evidence for Final visual", { selector: "input" })).toBeTruthy();
     expect(screen.getByText(/Maximum file size: 10 MiB/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Submit evidence" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Upload & Submit|Submit evidence/ })).toBeTruthy();
   });
 
   it("shows the client proof CID, gateway, and exact hash before enabling confirmation", async () => {
@@ -149,13 +149,13 @@ describe("JobDetailPage action visibility", () => {
     renderPage();
     expect(await screen.findByText(proofHash)).toBeTruthy();
     expect(screen.getByRole("link", { name: "Open evidence in IPFS gateway" }).getAttribute("href")).toBe(`https://w3s.link/ipfs/${cid}`);
-    expect(screen.getByRole("button", { name: "Confirm release" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Approve & Release|Confirm release/ })).toBeTruthy();
   });
 
   it("invalidates the worker balance after a client confirmation receipt", async () => {
     testState.snapshot = snapshot(JOB_STATUS.InProgress, MILESTONE_STATUS.Submitted, cid);
     renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "Confirm release" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Approve & Release|Confirm release/ }));
     await waitFor(() => expect(testState.invalidateJobQueries).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       accounts: [client, worker],
     })));
@@ -179,7 +179,7 @@ describe("JobDetailPage action visibility", () => {
     renderPage();
     expect(await screen.findByLabelText("Evidence for First proof")).toBeTruthy();
     expect(screen.getByText(proofHash)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Confirm release" }));
+    fireEvent.click(screen.getByRole("button", { name: /Approve & Release|Confirm release/ }));
     await waitFor(() => expect(testState.runConfirm).toHaveBeenCalledWith(expect.objectContaining({
       request: expect.objectContaining({ args: [0n] }),
     })));
@@ -190,7 +190,7 @@ describe("JobDetailPage action visibility", () => {
     renderPage();
     expect(await screen.findByText("not-a-valid-cid")).toBeTruthy();
     expect(screen.getByText("Gateway unavailable for this CID.")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Confirm release" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Approve & Release|Confirm release/ })).toBeTruthy();
   });
 
   it("does not expose active job actions to an irrelevant wallet", async () => {
@@ -198,7 +198,7 @@ describe("JobDetailPage action visibility", () => {
     testState.snapshot = snapshot(JOB_STATUS.InProgress);
     renderPage();
     await screen.findByText("Illustrate the protocol update");
-    expect(screen.queryByRole("button", { name: /Fund escrow|Accept job|Submit evidence|Confirm release/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Fund escrow|Accept job|Submit evidence|Upload & Submit|Confirm release|Approve & Release/ })).toBeNull();
   });
 
   it("uploads the selected file before submitting its exact CID and raw-byte hash to the escrow", async () => {
@@ -207,7 +207,7 @@ describe("JobDetailPage action visibility", () => {
     renderPage();
     const file = new File(["final delivery"], "delivery.txt", { type: "text/plain" });
     fireEvent.change(await screen.findByLabelText("Evidence for Final visual", { selector: "input" }), { target: { files: [file] } });
-    fireEvent.click(screen.getByRole("button", { name: "Submit evidence" }));
+    fireEvent.click(screen.getByRole("button", { name: /Upload & Submit|Submit evidence/ }));
 
     await waitFor(() => expect(testState.uploadEvidence).toHaveBeenCalledWith(file));
     expect(testState.runSubmitProof).toHaveBeenCalledWith(expect.objectContaining({
@@ -227,7 +227,7 @@ describe("JobDetailPage action visibility", () => {
     const view = renderPage();
     const file = new File(["delivery"], "delivery.txt", { type: "text/plain" });
     fireEvent.change(await screen.findByLabelText("Evidence for Final visual", { selector: "input" }), { target: { files: [file] } });
-    fireEvent.click(screen.getByRole("button", { name: "Submit evidence" }));
+    fireEvent.click(screen.getByRole("button", { name: /Upload & Submit|Submit evidence/ }));
     await waitFor(() => expect(testState.uploadEvidence).toHaveBeenCalledWith(file));
     testState.wallet.address = stranger;
     view.refresh();
@@ -245,7 +245,7 @@ describe("JobDetailPage action visibility", () => {
     const view = renderPage();
     const file = new File(["delivery"], "delivery.txt", { type: "text/plain" });
     fireEvent.change(await screen.findByLabelText("Evidence for Final visual", { selector: "input" }), { target: { files: [file] } });
-    fireEvent.click(screen.getByRole("button", { name: "Submit evidence" }));
+    fireEvent.click(screen.getByRole("button", { name: /Upload & Submit|Submit evidence/ }));
     await waitFor(() => expect(testState.uploadEvidence).toHaveBeenCalledWith(file));
     testState.wallet.canWrite = false;
     view.refresh();
