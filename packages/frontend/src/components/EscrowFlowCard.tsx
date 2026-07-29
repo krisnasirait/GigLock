@@ -41,7 +41,7 @@ export function EscrowFlowCard() {
         <FlowNode
           icon="👤"
           label="CLIENT WALLET"
-          address="0x8A92...F31D"
+          address="0xC11E...NT01"
           color="#10b981"
         />
 
@@ -64,12 +64,12 @@ export function EscrowFlowCard() {
             </div>
             <div>
               <div className="text-[10px] font-bold text-[#10b981] uppercase tracking-wider">Escrow Smart Contract</div>
-              <div className="text-xs font-mono text-white/80">0x72FA...9912</div>
+              <div className="text-xs font-mono text-white/80">0xESCR...0W01</div>
             </div>
           </div>
           <div className="text-center py-1.5 bg-[#050e09] rounded-xl border border-[#10b981]/15">
-            <span className="text-2xl font-black text-white">500 </span>
-            <span className="text-xs font-bold text-[#34d399] tracking-wider">USDC LOCKED</span>
+            <span className="text-2xl font-black text-white">USDC </span>
+            <span className="text-xs font-bold text-[#34d399] tracking-wider">LOCKED IN ESCROW</span>
           </div>
         </div>
 
@@ -80,7 +80,7 @@ export function EscrowFlowCard() {
         <FlowNode
           icon="👷"
           label="WORKER WALLET"
-          address="0x91BC...82AD"
+          address="0xW0RK...ER01"
           color="#34d399"
           released={activeState >= 3}
         />

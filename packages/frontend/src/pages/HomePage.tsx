@@ -225,11 +225,15 @@ export function HomePage() {
                   <div className="text-xs text-white/40 font-medium mt-0.5">Non-Custodial</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-black text-[#34d399]">$12.4M+</div>
+                  <div className="text-2xl font-black text-[#34d399]">
+                    {isInitialLoading ? '…' : isUnavailable ? '—' : (cardValues?.tvl ?? '—')}
+                  </div>
                   <div className="text-xs text-white/40 font-medium mt-0.5">Testnet Volume</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-black text-white">8,400+</div>
+                  <div className="text-2xl font-black text-white">
+                    {isInitialLoading ? '…' : isUnavailable ? '—' : (metricsQuery.data?.totalJobs.toLocaleString('en-US') ?? '—')}
+                  </div>
                   <div className="text-xs text-white/40 font-medium mt-0.5">Escrows Created</div>
                 </div>
                 <div>
