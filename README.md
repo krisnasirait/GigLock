@@ -2,7 +2,7 @@
 
 **Instant pay and portable reputation for gig workers, built on GIWA Chain.**
 
-[![contracts](https://img.shields.io/badge/contracts-19%20passing-brightgreen)](packages/contracts) [![relayer](https://img.shields.io/badge/relayer-5%20passing-brightgreen)](packages/relayer) [![frontend](https://img.shields.io/badge/frontend-landing%20live-blue)](packages/frontend) [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![contracts](https://img.shields.io/badge/contracts-19%20passing-brightgreen)](packages/contracts) [![relayer](https://img.shields.io/badge/relayer-5%20passing-brightgreen)](packages/relayer) [![frontend](https://img.shields.io/badge/frontend-landing%20live-blue)](packages/frontend) [![license](https://img.shields.io/badge/license-source--available-orange)](LICENSE)
 
 A trust layer for the gig economy: smart-contract escrow that pays workers the **same block** a milestone is confirmed, with reputation that's **portable** across any client app because it lives on a public contract keyed to wallet identity (and gated by GIWA's Dojang Verified Address).
 
@@ -240,7 +240,9 @@ When adding a new feature:
 
 ## License
 
-[MIT](LICENSE) © 2026 krisnasirait
+Source-available — see [LICENSE](LICENSE). © 2026 krisnasirait.
+
+You may view, fork for private use, and contribute back. Public republishing, redistribution, commercial use, and use in competing products are **not** permitted without written permission.
 
 ---
 

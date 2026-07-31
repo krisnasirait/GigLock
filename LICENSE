@@ -1,21 +1,58 @@
-MIT License
-
+Custom Source-Available License
 Copyright (c) 2026 krisnasirait
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+All rights reserved.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. DEFINITIONS
+   "Software" refers to the source code, documentation, and associated files
+   in this repository.
+   "Private Use" means use by an individual for personal, non-commercial
+   purposes, or use within a single organization for internal evaluation
+   and development.
+   "Public Republish" means distributing, uploading, sublicensing, or
+   otherwise making the Software (or any derivative work) available to
+   any third party, whether for free or for a fee, through any medium.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+2. GRANTED PERMISSIONS
+   Subject to the terms below, the copyright holder grants you the right to:
+   a) View and read the Software.
+   b) Fork the repository for Private Use.
+   c) Submit issues, bug reports, and pull requests back to the original
+      repository.
+   d) Make modifications for your own Private Use.
+
+3. RESTRICTIONS
+   You may NOT, without prior written permission from the copyright holder:
+   a) Publicly republish, redistribute, re-upload, or sublicense the
+      Software, in whole or in part.
+   b) Use the Software, or any modification thereof, for any commercial
+      purpose.
+   c) Use the Software, or any modification thereof, in any product or
+      service that competes with the Software or the copyright holder's
+      business.
+   d) Remove or alter this license or any copyright notice.
+
+4. CONTRIBUTIONS
+   By submitting a contribution (pull request, patch, or other submission)
+   to this repository, you agree that your contribution is licensed to
+   the copyright holder under the same terms as this license, and that
+   the copyright holder may incorporate your contribution under any terms
+   at their sole discretion.
+
+5. RESERVATION OF RIGHTS
+   All rights not expressly granted in this license are reserved by the
+   copyright holder.
+
+6. TERMINATION
+   This license is automatically terminated if you violate any of its
+   terms. Upon termination, you must cease all use and distribution of
+   the Software and destroy any copies in your possession.
+
+7. DISCLAIMER
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-
+   INFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR
+   ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+   CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION
+   WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
